@@ -87,9 +87,20 @@ export default function PlaygroundPage() {
                 });
                 const data = await response.json();
                 if (data.success && data.data) {
+                    const rawEstimates = data.data.estimates ?? data.data.results ?? [];
+                    const estimates = Array.isArray(rawEstimates)
+                        ? rawEstimates.filter((item): item is PriceEstimateV2 => (
+                            item &&
+                            typeof item === 'object' &&
+                            'modelId' in item &&
+                            'total' in item &&
+                            !('error' in item)
+                        ))
+                        : [];
+
                     setEstimateResult({
-                        estimates: data.data.estimates,
-                        cheapest: data.data.cheapest,
+                        estimates,
+                        cheapest: typeof data.data.cheapest === 'string' ? data.data.cheapest : '',
                     });
                 }
             } else {
@@ -238,7 +249,7 @@ export default function PlaygroundPage() {
                     {/* Cards Container */}
                     <div className="flex justify-between gap-[20px] mt-[10px]">
                         {/* Estimate mode: show estimate cards */}
-                        {mode === 'estimate' && estimateResult ? (
+                        {mode === 'estimate' && estimateResult && Array.isArray(estimateResult.estimates) ? (
                             estimateResult.estimates.map((estimate) => (
                                 <EstimateCard
                                     key={estimate.modelId}
