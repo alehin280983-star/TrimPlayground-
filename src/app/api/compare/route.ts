@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createProvider } from '@/lib/providers';
-import { getModelById, calculateCost } from '@/lib/config';
+import { getModelById } from '@/lib/config';
 import { CompletionRequest, CompletionResponse, CompletionError, ProviderType } from '@/types';
 import { generateId } from '@/lib/utils';
 

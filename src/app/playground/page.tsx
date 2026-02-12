@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { useUser } from '@clerk/nextjs';
 import { Header } from '@/components/layout';
-import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, OutputControl, APIKeyInput } from '@/components/playground';
+import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, OutputControl } from '@/components/playground';
 import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, ProviderType } from '@/types';
-import { getAllModels, formatCost } from '@/lib/config';
+import { getAllModels } from '@/lib/config';
 
 export default function PlaygroundPage() {
-    const { isSignedIn, isLoaded } = useUser();
     const [selectedModels, setSelectedModels] = useState<ModelConfig[]>([]);
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -26,28 +24,6 @@ export default function PlaygroundPage() {
     // New state for SPEC v2.0
     const [mode, setMode] = useState<CalculationMode>('estimate');
     const [expectedOutput, setExpectedOutput] = useState<number | undefined>(undefined);
-    const [apiKeys, setApiKeys] = useState<Partial<Record<ProviderType, string>>>({});
-
-    // Load API keys from session storage on mount
-    useEffect(() => {
-        const STORAGE_PREFIX = 'trim_api_key_';
-        const providers: ProviderType[] = ['openai', 'anthropic', 'google', 'mistral', 'cohere', 'deepseek', 'xai', 'alibaba'];
-        const keys: Partial<Record<ProviderType, string>> = {};
-
-        providers.forEach(p => {
-            if (typeof window !== 'undefined') {
-                const key = localStorage.getItem(`${STORAGE_PREFIX}${p}`) || sessionStorage.getItem(`${STORAGE_PREFIX}${p}`);
-                if (key) keys[p] = key;
-            }
-        });
-
-        setApiKeys(keys);
-    }, []);
-
-    // Debug: Log when sampleResult changes
-    useEffect(() => {
-        console.log('sampleResult state changed:', sampleResult);
-    }, [sampleResult]);
 
     const allModels = getAllModels();
 
@@ -118,8 +94,6 @@ export default function PlaygroundPage() {
                     }
                 });
 
-                console.log('Sample mode API keys loaded:', Object.keys(freshApiKeys)); // Debug log
-
                 const response = await fetch('/api/sample', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -130,12 +104,8 @@ export default function PlaygroundPage() {
                     }),
                 });
                 const data = await response.json();
-                console.log('Sample API response:', data); // Debug log
                 if (data.success && data.data) {
-                    console.log('Setting sample results:', data.data.results?.length, 'results'); // Debug log
                     setSampleResult(data.data);
-                } else {
-                    console.error('Sample API returned unsuccessful response:', data); // Debug log
                 }
             }
         } catch (e) {
