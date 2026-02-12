@@ -4,7 +4,7 @@ import { getModelById, calculateCost } from '@/lib/config';
 import { CompletionRequest, CompletionResponse, CompletionError, ProviderType } from '@/types';
 import { generateId } from '@/lib/utils';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 seconds max
 
 interface CompareRequest {
