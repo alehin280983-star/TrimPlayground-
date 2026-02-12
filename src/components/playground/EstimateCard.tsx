@@ -103,8 +103,8 @@ export default function EstimateCard({ estimate, isCheapest }: EstimateCardProps
                 {estimate.warnings && estimate.warnings.length > 0 && (
                     <div className="space-y-1">
                         {estimate.warnings.map((warning, idx) => (
-                            <div key={idx} className="text-[0.65rem] text-orange-600 bg-orange-50 dark:bg-orange-900/10 px-2 py-1 rounded">
-                                ⚠️ {warning}
+                            <div key={idx} className="text-[0.65rem] text-amber-700 bg-amber-50 dark:bg-amber-900/10 px-2 py-1 rounded">
+                                ℹ {warning}
                             </div>
                         ))}
                     </div>

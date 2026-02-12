@@ -7,7 +7,7 @@ import { ModelConfig } from '@/types';
 export function countTokensSync(text: string): number {
     try {
         return encode(text).length;
-    } catch (error) {
+    } catch {
         // Fallback: rough estimate if tokenizer fails
         // Average: ~4 characters per token for English
         return Math.ceil(text.length / 4);
@@ -41,10 +41,11 @@ export function estimateCost(
  */
 export function formatCost(cost: number): string {
     if (cost === 0) return '$0.00';
-    if (cost < 0.0001) return `$${cost.toExponential(2)}`;
+    if (cost < 0.0001) return '<$0.0001';
     if (cost < 0.01) return `$${cost.toFixed(6)}`;
     if (cost < 1) return `$${cost.toFixed(4)}`;
-    return `$${cost.toFixed(2)}`;
+    if (cost < 100) return `$${cost.toFixed(2)}`;
+    return `$${cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /**
