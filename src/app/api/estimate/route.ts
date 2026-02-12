@@ -4,7 +4,7 @@ import { getModelById, getAllModels } from '@/lib/config';
 import { PriceRange, PriceEstimateV2 } from '@/types';
 
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 interface EstimateRequest {
     prompt: string;
