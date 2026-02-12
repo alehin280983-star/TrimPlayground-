@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { estimateCost, countTokensSync, formatCost, calculateConfidence, generateWarnings } from '@/lib/tokens';
-import { getModelById, getAllModels } from '@/lib/config';
+import { getModelById } from '@/lib/config';
 import { PriceRange, PriceEstimateV2 } from '@/types';
 
 
@@ -10,6 +9,43 @@ interface EstimateRequest {
     prompt: string;
     modelIds: string[];
     estimatedOutputTokens?: number;
+}
+
+function countTokensForEstimate(text: string): number {
+    return Math.ceil((text.length / 4) * 1.2);
+}
+
+function calculateEstimateConfidence(
+    hasUserEstimate: boolean,
+    isReasoningModel: boolean
+): 'high' | 'medium' | 'low' {
+    if (isReasoningModel) return 'low';
+    if (hasUserEstimate) return 'medium';
+    return 'low';
+}
+
+function buildEstimateWarnings(
+    hasUserEstimate: boolean,
+    isReasoningModel: boolean,
+    inputTokens: number
+): string[] {
+    const warnings: string[] = [];
+
+    warnings.push('This is a rough estimate. Actual cost may vary 2-3x.');
+
+    if (isReasoningModel) {
+        warnings.push('Reasoning tokens highly variable. Cannot estimate without API call.');
+    }
+
+    if (!hasUserEstimate) {
+        warnings.push('Output tokens estimated at 50% of max. Adjust for accuracy.');
+    }
+
+    if (inputTokens > 4000) {
+        warnings.push('Prompt exceeds 4000 tokens. Consider summarizing.');
+    }
+
+    return warnings;
 }
 
 export async function POST(request: NextRequest) {
@@ -60,7 +96,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Count input tokens
-        const inputTokens = countTokensSync(prompt);
+        const inputTokens = countTokensForEstimate(prompt);
 
         // Generate estimates for each model
         const estimates = modelIds.map(modelId => {
@@ -103,14 +139,12 @@ export async function POST(request: NextRequest) {
             };
 
             // Confidence and warnings
-            const confidence = calculateConfidence(
-                'estimate',
+            const confidence = calculateEstimateConfidence(
                 !!estimatedOutputTokens,
                 isReasoningModel
             );
 
-            const warnings = generateWarnings(
-                'estimate',
+            const warnings = buildEstimateWarnings(
                 !!estimatedOutputTokens,
                 isReasoningModel,
                 inputTokens
