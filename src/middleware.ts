@@ -5,7 +5,6 @@ const isPublicRoute = createRouteMatcher([
     '/',
     '/sign-in(.*)',
     '/sign-up(.*)',
-    '/api/estimate(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
@@ -17,9 +16,10 @@ export default clerkMiddleware(async (auth, request) => {
 
 export const config = {
     matcher: [
-        // Skip internal Next.js routes and static files
-        '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-        // Always run for API routes
-        '/(api|trpc)(.*)',
+        // Skip API routes here, they are matched separately below
+        '/((?!api|trpc|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+        // Run for API routes except /api/estimate to avoid Edge middleware size on that endpoint
+        '/api/((?!estimate).*)',
+        '/trpc(.*)',
     ],
 };
