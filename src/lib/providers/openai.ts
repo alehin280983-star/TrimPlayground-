@@ -199,10 +199,18 @@ export class OpenAIProvider extends BaseProvider {
         model: ModelConfig,
         startTime: number
     ): Promise<CompletionResponse> {
+        const requiresResearchTools = request.model.includes('deep-research');
+
         const responseParams: ResponseCreateParamsNonStreaming = {
             model: request.model,
             input: request.prompt,
             max_output_tokens: request.maxTokens || model.maxOutputTokens,
+            ...(requiresResearchTools
+                ? {
+                    // Deep Research models require at least one tool in Responses API.
+                    tools: [{ type: 'web_search_preview' }],
+                }
+                : {}),
         };
 
         const response: Response = await this.withTimeout(
