@@ -3,7 +3,7 @@ import { CompletionRequest, CompletionResponse, ProviderType } from '@/types';
 import { getModelById, calculateCost } from '@/lib/config';
 
 export class MoonshotProvider extends BaseProvider {
-    private baseUrl = 'https://api.moonshot.cn/v1';
+    private baseUrl = process.env.MOONSHOT_BASE_URL || 'https://api.moonshot.ai/v1';
 
     constructor(apiKey?: string, timeout?: number) {
         super(apiKey || process.env.MOONSHOT_API_KEY || '', timeout);
