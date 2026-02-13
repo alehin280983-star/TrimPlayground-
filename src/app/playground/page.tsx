@@ -122,8 +122,8 @@ export default function PlaygroundPage() {
                 providers.forEach(p => {
                     if (typeof window !== 'undefined') {
                         const keyName = `${STORAGE_PREFIX}${p}`;
-                        // Priority: localStorage for auth users, sessionStorage as fallback or for guests
-                        const savedKey = localStorage.getItem(keyName) || sessionStorage.getItem(keyName);
+                        // Prioritize session value to avoid stale local key overriding recent updates.
+                        const savedKey = (sessionStorage.getItem(keyName) || localStorage.getItem(keyName) || '').trim();
                         if (savedKey) freshApiKeys[p] = savedKey;
                     }
                 });
