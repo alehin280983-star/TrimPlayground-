@@ -7,6 +7,7 @@ export { CohereProvider } from './cohere';
 export { DeepSeekProvider } from './deepseek';
 export { XAIProvider } from './xai';
 export { AlibabaProvider } from './alibaba';
+export { MoonshotProvider } from './moonshot';
 
 import { ProviderType } from '@/types';
 import { OpenAIProvider } from './openai';
@@ -17,6 +18,7 @@ import { CohereProvider } from './cohere';
 import { DeepSeekProvider } from './deepseek';
 import { XAIProvider } from './xai';
 import { AlibabaProvider } from './alibaba';
+import { MoonshotProvider } from './moonshot';
 import { BaseProvider } from './base';
 
 /**
@@ -40,6 +42,8 @@ export function createProvider(providerType: ProviderType): BaseProvider {
             return new XAIProvider();
         case 'alibaba':
             return new AlibabaProvider();
+        case 'moonshot':
+            return new MoonshotProvider();
         default:
             throw new Error(`Unknown provider: ${providerType}`);
     }
@@ -74,6 +78,9 @@ export function getConfiguredProviders(): Map<ProviderType, BaseProvider> {
 
     const alibaba = new AlibabaProvider();
     if (alibaba.isConfigured()) providers.set('alibaba', alibaba);
+
+    const moonshot = new MoonshotProvider();
+    if (moonshot.isConfigured()) providers.set('moonshot', moonshot);
 
     return providers;
 }

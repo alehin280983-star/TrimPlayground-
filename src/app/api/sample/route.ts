@@ -7,6 +7,7 @@ import { CohereProvider } from '@/lib/providers/cohere';
 import { DeepSeekProvider } from '@/lib/providers/deepseek';
 import { XAIProvider } from '@/lib/providers/xai';
 import { AlibabaProvider } from '@/lib/providers/alibaba';
+import { MoonshotProvider } from '@/lib/providers/moonshot';
 import { getModelById } from '@/lib/config/models';
 import { ProviderType, SampleResultV2 } from '@/types';
 import { BaseProvider } from '@/lib/providers/base';
@@ -39,6 +40,8 @@ function createProviderWithKey(providerType: ProviderType, apiKey: string): Base
             return new XAIProvider(apiKey, 45000);
         case 'alibaba':
             return new AlibabaProvider(apiKey);
+        case 'moonshot':
+            return new MoonshotProvider(apiKey);
         default:
             throw new Error(`Provider ${providerType} not supported for sample mode`);
     }
