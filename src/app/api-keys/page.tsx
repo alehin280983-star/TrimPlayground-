@@ -16,7 +16,8 @@ export default function APIKeysPage() {
         'cohere',
         'deepseek',
         'xai',
-        'alibaba'
+        'alibaba',
+        'moonshot'
     ];
 
     return (

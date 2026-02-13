@@ -24,7 +24,7 @@ export default function ResponseCard({ result }: ResponseCardProps) {
         : result.total.median;
 
     const displayTokens = isSample
-        ? result.actualUsage.outputTokens
+        ? result.actualUsage.inputTokens + result.actualUsage.outputTokens
         : (typeof result.breakdown.output.tokens === 'number'
             ? result.breakdown.output.tokens
             : result.breakdown.output.tokens.median);
@@ -37,7 +37,7 @@ export default function ResponseCard({ result }: ResponseCardProps) {
                     {result.modelName}
                 </div>
                 <div className="text-[0.7rem] opacity-70">
-                    {`${formatCost(displayCost)} • ${formatTokens(displayTokens)} tokens`}
+                    {`${formatCost(displayCost)} • ${formatTokens(displayTokens)} total tokens`}
                     {isEstimate && ` (est)`}
                 </div>
             </div>
@@ -82,6 +82,7 @@ export default function ResponseCard({ result }: ResponseCardProps) {
                         )}
 
                         <div className="text-xs text-foreground/50 border-t border-foreground/10 pt-2">
+                            <div>Total Cost: {formatCost(result.actualCost)}</div>
                             <div>Latency: {result.latencyMs}ms</div>
                             {sampleMedia?.type === 'video' && sampleMedia.durationSeconds && (
                                 <div>Duration: {sampleMedia.durationSeconds.toFixed(1)}s</div>
@@ -94,6 +95,8 @@ export default function ResponseCard({ result }: ResponseCardProps) {
                             )}
                             {!sampleMedia && (
                                 <>
+                                    <div>Input Cost: {formatCost(result.breakdown.input.cost)}</div>
+                                    <div>Output Cost: {formatCost(typeof result.breakdown.output.cost === 'number' ? result.breakdown.output.cost : result.breakdown.output.cost.median)}</div>
                                     <div>Input: {formatTokens(result.actualUsage.inputTokens)} tokens</div>
                                     <div>Output: {formatTokens(result.actualUsage.outputTokens)} tokens</div>
                                 </>

@@ -81,6 +81,7 @@ export default function APIKeyInput({ provider, onKeyChange }: APIKeyInputProps)
         deepseek: 'DeepSeek',
         xai: 'xAI',
         alibaba: 'Alibaba',
+        moonshot: 'Moonshot',
     };
 
     const inputId = `api-key-${provider}`;

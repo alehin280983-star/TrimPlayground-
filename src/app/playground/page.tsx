@@ -82,7 +82,7 @@ export default function PlaygroundPage() {
             } else {
                 // Sample mode - reload API keys from session storage before making the call
                 const STORAGE_PREFIX = 'trim_api_key_';
-                const providers: ProviderType[] = ['openai', 'anthropic', 'google', 'mistral', 'cohere', 'deepseek', 'xai', 'alibaba'];
+                const providers: ProviderType[] = ['openai', 'anthropic', 'google', 'mistral', 'cohere', 'deepseek', 'xai', 'alibaba', 'moonshot'];
                 const freshApiKeys: Partial<Record<ProviderType, string>> = {};
 
                 providers.forEach(p => {
