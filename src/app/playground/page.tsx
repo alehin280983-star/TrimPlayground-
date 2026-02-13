@@ -7,6 +7,38 @@ import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, OutputC
 import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, ProviderType } from '@/types';
 import { getAllModels } from '@/lib/config';
 
+type ModelCategory = 'text_code' | 'image' | 'audio' | 'video' | 'embedding';
+
+const CATEGORY_ORDER: ModelCategory[] = ['text_code', 'image', 'audio', 'video', 'embedding'];
+
+const CATEGORY_LABELS: Record<ModelCategory, string> = {
+    text_code: 'Text / Code',
+    image: 'Image',
+    audio: 'Audio',
+    video: 'Video',
+    embedding: 'Embedding',
+};
+
+const PROVIDER_LABELS: Record<ProviderType, string> = {
+    openai: 'OpenAI',
+    anthropic: 'Anthropic',
+    google: 'Google',
+    mistral: 'Mistral',
+    cohere: 'Cohere',
+    deepseek: 'DeepSeek',
+    xai: 'xAI',
+    alibaba: 'Alibaba Cloud',
+    moonshot: 'Moonshot',
+};
+
+function getModelCategory(model: ModelConfig): ModelCategory {
+    if (model.modality === 'image') return 'image';
+    if (model.modality === 'audio') return 'audio';
+    if (model.modality === 'video') return 'video';
+    if (model.modality === 'embedding') return 'embedding';
+    return 'text_code';
+}
+
 export default function PlaygroundPage() {
     const [selectedModels, setSelectedModels] = useState<ModelConfig[]>([]);
     const [prompt, setPrompt] = useState('');
@@ -27,12 +59,14 @@ export default function PlaygroundPage() {
 
     const allModels = getAllModels();
 
-    // Group models by provider for the sidebar
-    const modelsByProvider = allModels.reduce((acc, model) => {
-        if (!acc[model.provider]) acc[model.provider] = [];
-        acc[model.provider].push(model);
+    // Group models by Category -> Provider for the sidebar
+    const modelsByCategory = allModels.reduce((acc, model) => {
+        const category = getModelCategory(model);
+        if (!acc[category]) acc[category] = {} as Record<ProviderType, ModelConfig[]>;
+        if (!acc[category][model.provider]) acc[category][model.provider] = [];
+        acc[category][model.provider].push(model);
         return acc;
-    }, {} as Record<string, ModelConfig[]>);
+    }, {} as Record<ModelCategory, Record<ProviderType, ModelConfig[]>>);
 
     const handleModelToggle = (model: ModelConfig) => {
         setSelectedModels(prev => {
@@ -128,25 +162,42 @@ export default function PlaygroundPage() {
                             Model Reference
                         </div>
                         <div className="p-[15px] overflow-y-auto h-full">
-                            {Object.entries(modelsByProvider).map(([provider, models]) => (
-                                <div key={provider} className="mb-6">
-                                    <div className="font-bold border-b border-foreground/10 pb-1 mb-2 text-[0.85rem] uppercase opacity-40">
-                                        {provider}
-                                    </div>
-                                    {models.map(model => (
-                                        <div
-                                            key={model.id}
-                                            onClick={() => handleModelToggle(model)}
-                                            className={`
-                                                text-[0.85rem] py-1.5 cursor-pointer hover:text-foreground transition-colors
-                                                ${selectedModels.find(m => m.id === model.id) ? 'font-bold text-foreground' : 'text-foreground/60'}
-                                            `}
-                                        >
-                                            {model.name} {selectedModels.find(m => m.id === model.id) && '(Selected)'}
+                            {CATEGORY_ORDER.map((category) => {
+                                const providersInCategory = modelsByCategory[category];
+                                if (!providersInCategory) return null;
+
+                                const providerEntries = Object.entries(providersInCategory)
+                                    .sort(([a], [b]) => PROVIDER_LABELS[a as ProviderType].localeCompare(PROVIDER_LABELS[b as ProviderType]));
+
+                                if (providerEntries.length === 0) return null;
+
+                                return (
+                                    <div key={category} className="mb-6">
+                                        <div className="font-extrabold border-b border-foreground/20 pb-1 mb-3 text-[0.82rem] uppercase tracking-wide opacity-80">
+                                            {CATEGORY_LABELS[category]}
                                         </div>
-                                    ))}
-                                </div>
-                            ))}
+                                        {providerEntries.map(([provider, models]) => (
+                                            <div key={`${category}-${provider}`} className="mb-4">
+                                                <div className="font-bold border-b border-foreground/10 pb-1 mb-2 text-[0.78rem] uppercase opacity-50">
+                                                    {PROVIDER_LABELS[provider as ProviderType]}
+                                                </div>
+                                                {[...models].sort((a, b) => a.name.localeCompare(b.name)).map(model => (
+                                                    <div
+                                                        key={model.id}
+                                                        onClick={() => handleModelToggle(model)}
+                                                        className={`
+                                                            text-[0.85rem] py-1.5 cursor-pointer hover:text-foreground transition-colors
+                                                            ${selectedModels.find(m => m.id === model.id) ? 'font-bold text-foreground' : 'text-foreground/60'}
+                                                        `}
+                                                    >
+                                                        {model.name} {selectedModels.find(m => m.id === model.id) && '(Selected)'}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
