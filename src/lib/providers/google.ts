@@ -315,7 +315,8 @@ export class GoogleProvider extends BaseProvider {
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 lastError = message;
-                if (this.shouldTryNextApiVersion(500, message, request.model)) {
+                const statusCode = this.getStatusCodeFromError(error) ?? 500;
+                if (this.shouldTryNextApiVersion(statusCode, message, request.model)) {
                     continue;
                 }
                 throw error;
@@ -330,38 +331,152 @@ export class GoogleProvider extends BaseProvider {
         modelId: string,
         prompt: string
     ): Promise<{ operationName: string | null; payload: unknown }> {
-        const endpoint = `${baseUrl}/models/${encodeURIComponent(modelId)}:generateVideos`;
-        const payloads: unknown[] = [
-            { prompt: { text: prompt }, config: { numberOfVideos: 1 } },
-            { prompt, config: { numberOfVideos: 1 } },
-            { instances: [{ prompt }], parameters: { sampleCount: 1 } },
-        ];
+        const modelCandidates = this.getVideoModelCandidates(modelId);
+        let lastError: { message: string; statusCode: number; status: string } | null = null;
 
-        let lastError = '';
-        for (const payload of payloads) {
-            const response = await this.withTimeout(
-                fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': this.apiKey,
-                    },
-                    body: JSON.stringify(payload),
-                })
-            );
+        for (const candidateModel of modelCandidates) {
+            const attempts = this.buildVideoStartAttempts(baseUrl, candidateModel, prompt);
+            for (const attempt of attempts) {
+                const response = await this.withTimeout(
+                    fetch(attempt.endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-goog-api-key': this.apiKey,
+                        },
+                        body: JSON.stringify(attempt.payload),
+                    })
+                );
 
-            if (!response.ok) {
-                const parsedError = await this.parseGoogleErrorResponse(response);
-                lastError = parsedError.message;
-                continue;
+                if (!response.ok) {
+                    lastError = await this.parseGoogleErrorResponse(response);
+                    continue;
+                }
+
+                const data = await response.json();
+                const operationName = this.extractOperationName(data);
+                return { operationName, payload: data };
             }
-
-            const data = await response.json();
-            const operationName = this.extractOperationName(data);
-            return { operationName, payload: data };
         }
 
-        throw new Error(lastError || 'Google generateVideos request failed');
+        if (lastError) {
+            throw this.createGoogleApiError(lastError.message, lastError.statusCode, lastError.status);
+        }
+
+        throw new Error('Google video request failed');
+    }
+
+    private buildVideoStartAttempts(
+        baseUrl: string,
+        modelId: string,
+        prompt: string
+    ): Array<{ endpoint: string; payload: unknown }> {
+        const predictLongRunningEndpoint = `${baseUrl}/models/${encodeURIComponent(modelId)}:predictLongRunning`;
+        const generateVideosEndpoint = `${baseUrl}/models/${encodeURIComponent(modelId)}:generateVideos`;
+        return [
+            {
+                endpoint: predictLongRunningEndpoint,
+                payload: {
+                    instances: [{ prompt }],
+                    parameters: {
+                        aspectRatio: '16:9',
+                    },
+                },
+            },
+            {
+                endpoint: predictLongRunningEndpoint,
+                payload: {
+                    instances: [{ prompt }],
+                    parameters: {
+                        sampleCount: 1,
+                        aspectRatio: '16:9',
+                    },
+                },
+            },
+            {
+                endpoint: predictLongRunningEndpoint,
+                payload: {
+                    instances: [{ prompt: { text: prompt } }],
+                    parameters: {
+                        aspectRatio: '16:9',
+                    },
+                },
+            },
+            {
+                endpoint: predictLongRunningEndpoint,
+                payload: {
+                    instances: [{ prompt }],
+                },
+            },
+            {
+                endpoint: generateVideosEndpoint,
+                payload: { prompt: { text: prompt }, config: { numberOfVideos: 1 } },
+            },
+            {
+                endpoint: generateVideosEndpoint,
+                payload: { prompt, config: { numberOfVideos: 1 } },
+            },
+        ];
+    }
+
+    private getVideoModelCandidates(modelId: string): string[] {
+        const aliases: Record<string, string[]> = {
+            'veo-3.0-generate-001': ['veo-3.0-generate-preview'],
+            'veo-3.0-fast-generate-001': ['veo-3.0-fast-generate-preview'],
+            'veo-2.0-generate-001': ['veo-2.0-generate-preview'],
+        };
+
+        const candidates = [modelId, ...(aliases[modelId] || [])];
+        return [...new Set(candidates)];
+    }
+
+    private createGoogleApiError(message: string, statusCode: number, status: string): Error {
+        const error = new Error(message) as Error & { statusCode?: number; status?: string };
+        error.statusCode = statusCode;
+        error.status = status;
+        return error;
+    }
+
+    private getStatusCodeFromError(error: unknown): number | undefined {
+        if (!error || typeof error !== 'object') return undefined;
+        const record = error as Record<string, unknown>;
+        return typeof record.statusCode === 'number' ? record.statusCode : undefined;
+    }
+
+    private resolveOperationPath(baseUrl: string, operationName: string): string {
+        if (/^https?:\/\//i.test(operationName)) {
+            return operationName;
+        }
+
+        const trimmed = operationName.trim();
+        const base = new URL(baseUrl);
+        const versionPath = base.pathname.replace(/\/+$/, '');
+
+        if (trimmed.startsWith('/')) {
+            return `${base.origin}${trimmed}`;
+        }
+
+        if (trimmed.startsWith('operations/')) {
+            return `${base.origin}${versionPath}/${trimmed}`;
+        }
+
+        if (trimmed.startsWith('v1/') || trimmed.startsWith('v1beta/')) {
+            return `${base.origin}/${trimmed}`;
+        }
+
+        if (trimmed.startsWith('projects/')) {
+            return `${base.origin}${versionPath}/${trimmed}`;
+        }
+
+        return `${base.origin}${versionPath}/operations/${trimmed}`;
+    }
+
+    private isOperationDone(data: unknown): boolean {
+        if (!data || typeof data !== 'object') return false;
+        const record = data as Record<string, unknown>;
+        if (typeof record.done === 'boolean') return record.done;
+        const status = typeof record.status === 'string' ? record.status.toUpperCase() : '';
+        return status === 'SUCCEEDED' || status === 'FAILED' || status === 'CANCELLED' || status === 'DONE';
     }
 
     private async pollVideoOperation(
@@ -373,9 +488,7 @@ export class GoogleProvider extends BaseProvider {
     ): Promise<CompletionResponse> {
         const maxWaitMs = Math.min(Math.max(this.timeout, 30000), 55000);
         const deadline = Date.now() + maxWaitMs;
-        const opPath = operationName.startsWith('operations/')
-            ? `${baseUrl}/${operationName}`
-            : `${baseUrl}/operations/${operationName}`;
+        const opPath = this.resolveOperationPath(baseUrl, operationName);
 
         while (Date.now() < deadline) {
             const response = await this.withTimeout(
@@ -394,7 +507,7 @@ export class GoogleProvider extends BaseProvider {
             }
 
             const data = await response.json();
-            const done = Boolean((data as Record<string, unknown>).done);
+            const done = this.isOperationDone(data);
             const opError = this.extractOperationError(data);
             if (opError) {
                 throw new Error(opError);
@@ -829,6 +942,7 @@ export class GoogleProvider extends BaseProvider {
         if (!data || typeof data !== 'object') return null;
         const record = data as Record<string, unknown>;
         if (typeof record.name === 'string' && record.name) return record.name;
+        if (typeof record.operationName === 'string' && record.operationName) return record.operationName;
         const operation = record.operation && typeof record.operation === 'object'
             ? (record.operation as Record<string, unknown>)
             : undefined;
@@ -841,11 +955,19 @@ export class GoogleProvider extends BaseProvider {
         const errorObj = record.error && typeof record.error === 'object'
             ? (record.error as Record<string, unknown>)
             : undefined;
-        if (!errorObj) return null;
-        if (typeof errorObj.message === 'string') return errorObj.message;
-        if (typeof errorObj.code === 'string') return errorObj.code;
-        if (typeof errorObj.code === 'number') return `Operation failed: ${errorObj.code}`;
-        return 'Operation failed';
+        if (errorObj) {
+            if (typeof errorObj.message === 'string') return errorObj.message;
+            if (typeof errorObj.code === 'string') return errorObj.code;
+            if (typeof errorObj.code === 'number') return `Operation failed: ${errorObj.code}`;
+            return 'Operation failed';
+        }
+
+        const status = typeof record.status === 'string' ? record.status.toUpperCase() : '';
+        if (status === 'FAILED' || status === 'CANCELLED') {
+            return `Operation ${status.toLowerCase()}`;
+        }
+
+        return null;
     }
 
     private extractGeneratedVideo(data: unknown): { url: string; durationSeconds?: number } | null {
@@ -860,6 +982,21 @@ export class GoogleProvider extends BaseProvider {
         for (const candidate of candidates) {
             if (!candidate || typeof candidate !== 'object') continue;
             const record = candidate as Record<string, unknown>;
+
+            // REST predictLongRunning response shape:
+            // response.generateVideoResponse.generatedSamples[0].video.uri
+            const generateVideoResponse = record.generateVideoResponse && typeof record.generateVideoResponse === 'object'
+                ? (record.generateVideoResponse as Record<string, unknown>)
+                : undefined;
+            const generatedSamples = generateVideoResponse && Array.isArray(generateVideoResponse.generatedSamples)
+                ? generateVideoResponse.generatedSamples
+                : [];
+            if (generatedSamples.length > 0 && generatedSamples[0] && typeof generatedSamples[0] === 'object') {
+                const sampleVideo = (generatedSamples[0] as Record<string, unknown>).video;
+                const parsed = this.extractVideoFromRecord(sampleVideo);
+                if (parsed) return parsed;
+            }
+
             const generatedVideos = Array.isArray(record.generatedVideos) ? record.generatedVideos : [];
             if (generatedVideos.length > 0) {
                 const first = generatedVideos[0];
