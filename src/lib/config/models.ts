@@ -639,8 +639,8 @@ const googleModels: ModelConfig[] = [
         outputPrice: 0.01, // $10.00 / 1M (<= 200K tokens)
         cachedInputPrice: 0.000125, // $0.125 / 1M cache hit (<= 200K tokens)
         pricingTiers: [
-            { range: '<=200K tokens', inputPrice: 0.00125, outputPrice: 0.01 },
-            { range: '>200K tokens', inputPrice: 0.0025, outputPrice: 0.015 },
+            { range: '0K-200K', inputPrice: 0.00125, outputPrice: 0.01 },
+            { range: '200K-Infinity', inputPrice: 0.0025, outputPrice: 0.015 },
         ],
         maxTokens: 2000000,
         maxOutputTokens: 8192,
@@ -2094,6 +2094,7 @@ export function calculateCost(
 
     // Handle tiered pricing formats:
     // - "0-256K"
+    // - "200K-Infinity"
     // - "<=200K tokens"
     // - ">200K tokens"
     if (model.pricingTiers && model.pricingTiers.length > 0) {
@@ -2103,6 +2104,9 @@ export function calculateCost(
                 .replace(/TOKENS?/g, '')
                 .replace(/\s+/g, '')
                 .trim();
+            if (cleaned === 'INFINITY' || cleaned === 'INF' || cleaned === '∞') {
+                return Infinity;
+            }
             const match = cleaned.match(/^(\d+(?:\.\d+)?)([KM])?$/);
             if (!match) return Number.NaN;
             const amount = parseFloat(match[1]);
