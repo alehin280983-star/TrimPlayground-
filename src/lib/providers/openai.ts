@@ -13,6 +13,7 @@ import { getModelById, calculateCost } from '@/lib/config';
 
 export class OpenAIProvider extends BaseProvider {
     private client: OpenAI;
+    private videoPollIntervalMs = 2000;
 
     constructor(apiKey?: string, timeout?: number) {
         super(apiKey || process.env.OPENAI_API_KEY || '', timeout);
@@ -35,6 +36,10 @@ export class OpenAIProvider extends BaseProvider {
         }
 
         const modality = model.modality ?? 'text';
+        if (modality === 'video') {
+            return this.completeVideo(request, model, startTime);
+        }
+
         if (modality !== 'text') {
             throw this.parseError(
                 new Error(`Model ${request.model} (${modality}) is not supported for text completion`),
@@ -284,5 +289,113 @@ export class OpenAIProvider extends BaseProvider {
             message.includes('v1/chat/completions') ||
             message.includes('did you mean to use v1/completions')
         );
+    }
+
+    private async completeVideo(
+        request: CompletionRequest,
+        model: ModelConfig,
+        startTime: number
+    ): Promise<CompletionResponse> {
+        const { apiModel, size } = this.resolveOpenAIVideoModel(request.model);
+
+        const createdVideo = await this.withTimeout(
+            this.client.videos.create({
+                model: apiModel,
+                prompt: request.prompt,
+                seconds: '4',
+                ...(size ? { size } : {}),
+            })
+        );
+
+        const requestId = createdVideo.id;
+        if (!requestId) {
+            throw new Error('OpenAI video generation did not return video id');
+        }
+
+        const maxWaitMs = Math.min(Math.max(this.timeout, 30000), 55000);
+        const deadline = Date.now() + maxWaitMs;
+
+        let latest = createdVideo;
+        while (Date.now() < deadline) {
+            const status = String(latest.status || '').toLowerCase();
+            if (status === 'failed') {
+                const reason = latest.error?.message || latest.error?.code || 'OpenAI video generation failed';
+                throw new Error(reason);
+            }
+
+            if (status === 'completed') {
+                const durationSeconds = this.parseVideoSeconds(latest.seconds);
+                const totalCost = durationSeconds && model.pricePerSecond
+                    ? durationSeconds * model.pricePerSecond
+                    : 0;
+
+                return {
+                    provider: this.providerType,
+                    model: request.model,
+                    content: `Video completed (id: ${requestId})`,
+                    media: {
+                        type: 'video',
+                        url: '',
+                        durationSeconds: durationSeconds || undefined,
+                        status: 'completed',
+                        requestId,
+                    },
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    totalTokens: 0,
+                    inputCost: 0,
+                    outputCost: totalCost,
+                    totalCost,
+                    durationMs: Date.now() - startTime,
+                    finishReason: 'complete',
+                };
+            }
+
+            await this.sleep(this.videoPollIntervalMs);
+            latest = await this.withTimeout(this.client.videos.retrieve(requestId));
+        }
+
+        return {
+            provider: this.providerType,
+            model: request.model,
+            content: `Video generation in progress (id: ${requestId})`,
+            media: {
+                type: 'video',
+                url: '',
+                status: 'pending',
+                requestId,
+            },
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            inputCost: 0,
+            outputCost: 0,
+            totalCost: 0,
+            durationMs: Date.now() - startTime,
+            finishReason: 'stopped',
+        };
+    }
+
+    private resolveOpenAIVideoModel(modelId: string): { apiModel: 'sora-2' | 'sora-2-pro'; size?: '720x1280' | '1280x720' | '1024x1792' | '1792x1024' } {
+        if (modelId === 'sora-2-pro-high-res') {
+            return { apiModel: 'sora-2-pro', size: '1792x1024' };
+        }
+        if (modelId === 'sora-2-pro') {
+            return { apiModel: 'sora-2-pro' };
+        }
+        return { apiModel: 'sora-2' };
+    }
+
+    private parseVideoSeconds(value: unknown): number | null {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string') {
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) return parsed;
+        }
+        return null;
+    }
+
+    private async sleep(ms: number): Promise<void> {
+        await new Promise(resolve => setTimeout(resolve, ms));
     }
 }

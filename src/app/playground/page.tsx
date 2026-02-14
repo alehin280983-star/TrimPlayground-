@@ -31,6 +31,18 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
     moonshot: 'Moonshot',
 };
 
+const SAMPLE_SUPPORTED_MODALITIES: Record<ProviderType, Array<'text' | 'image' | 'video' | 'audio' | 'embedding'>> = {
+    openai: ['text', 'video'],
+    anthropic: ['text'],
+    google: ['text', 'image', 'video'],
+    mistral: ['text'],
+    cohere: ['text'],
+    deepseek: ['text'],
+    xai: ['text', 'image', 'video'],
+    alibaba: ['text'],
+    moonshot: ['text'],
+};
+
 function getModelCategory(model: ModelConfig): ModelCategory {
     if (model.modality === 'image') return 'image';
     if (model.modality === 'audio') return 'audio';
@@ -45,7 +57,8 @@ function isSampleSupportedModel(model: ModelConfig): boolean {
     if (id.includes('realtime')) return false;
     // OCR models require image/document input and a dedicated OCR endpoint.
     if (id.includes('ocr')) return false;
-    return true;
+    const modality = model.modality ?? 'text';
+    return SAMPLE_SUPPORTED_MODALITIES[model.provider].includes(modality);
 }
 
 export default function PlaygroundPage() {

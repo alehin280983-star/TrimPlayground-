@@ -9,6 +9,7 @@ export class GoogleProvider extends BaseProvider {
         'https://generativelanguage.googleapis.com/v1beta',
         'https://generativelanguage.googleapis.com/v1',
     ];
+    private readonly videoPollIntervalMs = 2000;
 
     constructor(apiKey?: string, timeout?: number) {
         super(apiKey || process.env.GOOGLE_AI_API_KEY || '', timeout);
@@ -32,6 +33,10 @@ export class GoogleProvider extends BaseProvider {
         }
 
         try {
+            if ((modelConfig.modality ?? 'text') === 'video') {
+                return await this.completeVideo(request, modelConfig, startTime);
+            }
+
             if (this.isImagenModel(request.model)) {
                 return await this.completeImagenPredict(request, modelConfig, startTime);
             }
@@ -257,6 +262,194 @@ export class GoogleProvider extends BaseProvider {
             };
         }
         throw new Error(lastError || 'Google generateContent failed on all API versions');
+    }
+
+    private async completeVideo(
+        request: CompletionRequest,
+        modelConfig: NonNullable<ReturnType<typeof getModelById>>,
+        startTime: number
+    ): Promise<CompletionResponse> {
+        let lastError: string | undefined;
+
+        for (const baseUrl of this.apiBaseUrls) {
+            try {
+                const started = await this.startVideoGeneration(baseUrl, request.model, request.prompt);
+                const immediate = this.extractGeneratedVideo(started.payload);
+                if (immediate) {
+                    const totalCost = immediate.durationSeconds && modelConfig.pricePerSecond
+                        ? immediate.durationSeconds * modelConfig.pricePerSecond
+                        : 0;
+                    return {
+                        provider: this.providerType,
+                        model: request.model,
+                        content: immediate.url || `Video completed (${request.model})`,
+                        media: {
+                            type: 'video',
+                            url: immediate.url || '',
+                            durationSeconds: immediate.durationSeconds,
+                            status: 'completed',
+                            requestId: started.operationName || undefined,
+                        },
+                        inputTokens: 0,
+                        outputTokens: 0,
+                        totalTokens: 0,
+                        inputCost: 0,
+                        outputCost: totalCost,
+                        totalCost,
+                        durationMs: Date.now() - startTime,
+                        finishReason: 'complete',
+                    };
+                }
+
+                if (!started.operationName) {
+                    throw new Error('Google video generation did not return operation id');
+                }
+
+                return await this.pollVideoOperation(
+                    baseUrl,
+                    request.model,
+                    started.operationName,
+                    modelConfig,
+                    startTime
+                );
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                lastError = message;
+                if (this.shouldTryNextApiVersion(500, message, request.model)) {
+                    continue;
+                }
+                throw error;
+            }
+        }
+
+        throw new Error(lastError || 'Google video generation failed on all API versions');
+    }
+
+    private async startVideoGeneration(
+        baseUrl: string,
+        modelId: string,
+        prompt: string
+    ): Promise<{ operationName: string | null; payload: unknown }> {
+        const endpoint = `${baseUrl}/models/${encodeURIComponent(modelId)}:generateVideos`;
+        const payloads: unknown[] = [
+            { prompt: { text: prompt }, config: { numberOfVideos: 1 } },
+            { prompt, config: { numberOfVideos: 1 } },
+            { instances: [{ prompt }], parameters: { sampleCount: 1 } },
+        ];
+
+        let lastError = '';
+        for (const payload of payloads) {
+            const response = await this.withTimeout(
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': this.apiKey,
+                    },
+                    body: JSON.stringify(payload),
+                })
+            );
+
+            if (!response.ok) {
+                const parsedError = await this.parseGoogleErrorResponse(response);
+                lastError = parsedError.message;
+                continue;
+            }
+
+            const data = await response.json();
+            const operationName = this.extractOperationName(data);
+            return { operationName, payload: data };
+        }
+
+        throw new Error(lastError || 'Google generateVideos request failed');
+    }
+
+    private async pollVideoOperation(
+        baseUrl: string,
+        modelId: string,
+        operationName: string,
+        modelConfig: NonNullable<ReturnType<typeof getModelById>>,
+        startTime: number
+    ): Promise<CompletionResponse> {
+        const maxWaitMs = Math.min(Math.max(this.timeout, 30000), 55000);
+        const deadline = Date.now() + maxWaitMs;
+        const opPath = operationName.startsWith('operations/')
+            ? `${baseUrl}/${operationName}`
+            : `${baseUrl}/operations/${operationName}`;
+
+        while (Date.now() < deadline) {
+            const response = await this.withTimeout(
+                fetch(opPath, {
+                    method: 'GET',
+                    headers: {
+                        'x-goog-api-key': this.apiKey,
+                    },
+                }),
+                Math.min(this.timeout, 10000)
+            );
+
+            if (!response.ok) {
+                const parsedError = await this.parseGoogleErrorResponse(response);
+                throw new Error(parsedError.message);
+            }
+
+            const data = await response.json();
+            const done = Boolean((data as Record<string, unknown>).done);
+            const opError = this.extractOperationError(data);
+            if (opError) {
+                throw new Error(opError);
+            }
+
+            if (done) {
+                const generated = this.extractGeneratedVideo(data);
+                const totalCost = generated?.durationSeconds && modelConfig.pricePerSecond
+                    ? generated.durationSeconds * modelConfig.pricePerSecond
+                    : 0;
+
+                return {
+                    provider: this.providerType,
+                    model: modelId,
+                    content: generated?.url || `Video completed (${modelId})`,
+                    media: {
+                        type: 'video',
+                        url: generated?.url || '',
+                        durationSeconds: generated?.durationSeconds,
+                        status: 'completed',
+                        requestId: operationName,
+                    },
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    totalTokens: 0,
+                    inputCost: 0,
+                    outputCost: totalCost,
+                    totalCost,
+                    durationMs: Date.now() - startTime,
+                    finishReason: 'complete',
+                };
+            }
+
+            await this.sleep(this.videoPollIntervalMs);
+        }
+
+        return {
+            provider: this.providerType,
+            model: modelId,
+            content: `Video generation in progress (${operationName})`,
+            media: {
+                type: 'video',
+                url: '',
+                status: 'pending',
+                requestId: operationName,
+            },
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            inputCost: 0,
+            outputCost: 0,
+            totalCost: 0,
+            durationMs: Date.now() - startTime,
+            finishReason: 'stopped',
+        };
     }
 
     private async completeViaInteractions(
@@ -630,5 +823,96 @@ export class GoogleProvider extends BaseProvider {
         }
 
         return { base64: '' };
+    }
+
+    private extractOperationName(data: unknown): string | null {
+        if (!data || typeof data !== 'object') return null;
+        const record = data as Record<string, unknown>;
+        if (typeof record.name === 'string' && record.name) return record.name;
+        const operation = record.operation && typeof record.operation === 'object'
+            ? (record.operation as Record<string, unknown>)
+            : undefined;
+        return typeof operation?.name === 'string' ? operation.name : null;
+    }
+
+    private extractOperationError(data: unknown): string | null {
+        if (!data || typeof data !== 'object') return null;
+        const record = data as Record<string, unknown>;
+        const errorObj = record.error && typeof record.error === 'object'
+            ? (record.error as Record<string, unknown>)
+            : undefined;
+        if (!errorObj) return null;
+        if (typeof errorObj.message === 'string') return errorObj.message;
+        if (typeof errorObj.code === 'string') return errorObj.code;
+        if (typeof errorObj.code === 'number') return `Operation failed: ${errorObj.code}`;
+        return 'Operation failed';
+    }
+
+    private extractGeneratedVideo(data: unknown): { url: string; durationSeconds?: number } | null {
+        if (!data || typeof data !== 'object') return null;
+        const root = data as Record<string, unknown>;
+
+        const candidates: unknown[] = [];
+        candidates.push(root);
+        if (root.response && typeof root.response === 'object') candidates.push(root.response);
+        if (root.result && typeof root.result === 'object') candidates.push(root.result);
+
+        for (const candidate of candidates) {
+            if (!candidate || typeof candidate !== 'object') continue;
+            const record = candidate as Record<string, unknown>;
+            const generatedVideos = Array.isArray(record.generatedVideos) ? record.generatedVideos : [];
+            if (generatedVideos.length > 0) {
+                const first = generatedVideos[0];
+                if (first && typeof first === 'object') {
+                    const video = (first as Record<string, unknown>).video;
+                    const parsed = this.extractVideoFromRecord(video);
+                    if (parsed) return parsed;
+                }
+            }
+
+            const videos = Array.isArray(record.videos) ? record.videos : [];
+            if (videos.length > 0) {
+                const parsed = this.extractVideoFromRecord(videos[0]);
+                if (parsed) return parsed;
+            }
+
+            const direct = this.extractVideoFromRecord(record.video);
+            if (direct) return direct;
+        }
+
+        return null;
+    }
+
+    private extractVideoFromRecord(value: unknown): { url: string; durationSeconds?: number } | null {
+        if (!value || typeof value !== 'object') return null;
+        const record = value as Record<string, unknown>;
+        const url = typeof record.uri === 'string'
+            ? record.uri
+            : (typeof record.url === 'string' ? record.url : '');
+        if (!url) return null;
+
+        const metadata = record.videoMetadata && typeof record.videoMetadata === 'object'
+            ? (record.videoMetadata as Record<string, unknown>)
+            : undefined;
+        const durationRaw = metadata?.videoDuration;
+        const durationSeconds = this.parseDurationSeconds(durationRaw);
+        return { url, durationSeconds: durationSeconds || undefined };
+    }
+
+    private parseDurationSeconds(value: unknown): number | null {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim().toLowerCase();
+        const secondsMatch = trimmed.match(/^(\d+(?:\.\d+)?)s$/);
+        if (secondsMatch) {
+            const parsed = Number(secondsMatch[1]);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+        const numeric = Number(trimmed);
+        return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    private async sleep(ms: number): Promise<void> {
+        await new Promise(resolve => setTimeout(resolve, ms));
     }
 }
