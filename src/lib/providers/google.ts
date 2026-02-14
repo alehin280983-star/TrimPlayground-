@@ -35,6 +35,13 @@ export class GoogleProvider extends BaseProvider {
             if (this.isImagenModel(request.model)) {
                 return await this.completeImagenPredict(request, modelConfig, startTime);
             }
+            if (this.shouldPreferInteractions(request.model)) {
+                try {
+                    return await this.completeViaInteractions(request, modelConfig, startTime);
+                } catch {
+                    // Fall back to generateContent flow for compatibility.
+                }
+            }
             return await this.completeGenerateContent(request, modelConfig, startTime);
         } catch (error) {
             throw this.parseError(error, request.model);
@@ -109,6 +116,11 @@ export class GoogleProvider extends BaseProvider {
 
     private isImagenModel(modelId: string): boolean {
         return modelId.toLowerCase().startsWith('imagen-');
+    }
+
+    private shouldPreferInteractions(modelId: string): boolean {
+        const id = modelId.toLowerCase();
+        return id === 'gemini-2.5-pro';
     }
 
     private async completeImagenPredict(
@@ -245,6 +257,61 @@ export class GoogleProvider extends BaseProvider {
             };
         }
         throw new Error(lastError || 'Google generateContent failed on all API versions');
+    }
+
+    private async completeViaInteractions(
+        request: CompletionRequest,
+        modelConfig: NonNullable<ReturnType<typeof getModelById>>,
+        startTime: number
+    ): Promise<CompletionResponse> {
+        const response = await this.withTimeout(
+            fetch(`${this.apiBaseUrls[0]}/interactions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': this.apiKey,
+                },
+                body: JSON.stringify({
+                    model: request.model,
+                    input: request.prompt,
+                    store: false,
+                }),
+            })
+        );
+
+        if (!response.ok) {
+            const parsedError = await this.parseGoogleErrorResponse(response);
+            throw new Error(parsedError.message);
+        }
+
+        const data = await response.json();
+        const output = this.extractInteractionOutput(data);
+        const usage = this.extractUsageMetadata(data);
+
+        const inputTokens = usage.promptTokenCount ?? this.estimateTokens(request.prompt);
+        const outputTokens = usage.candidatesTokenCount ?? (output.text ? this.estimateTokens(output.text) : 0);
+        const costs = calculateCost(inputTokens, outputTokens, modelConfig);
+
+        return {
+            provider: this.providerType,
+            model: request.model,
+            content: output.text || output.imageDataUrl || '',
+            media: output.imageDataUrl
+                ? {
+                    type: 'image',
+                    url: output.imageDataUrl,
+                    status: 'completed',
+                }
+                : undefined,
+            inputTokens,
+            outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            inputCost: costs.inputCost,
+            outputCost: costs.outputCost,
+            totalCost: costs.totalCost,
+            durationMs: Date.now() - startTime,
+            finishReason: 'complete',
+        };
     }
 
     private async parseGoogleErrorResponse(response: globalThis.Response): Promise<{ message: string; statusCode: number; status: string }> {
@@ -470,11 +537,56 @@ export class GoogleProvider extends BaseProvider {
         const usage = record.usageMetadata && typeof record.usageMetadata === 'object'
             ? (record.usageMetadata as Record<string, unknown>)
             : undefined;
-        if (!usage) return {};
+        if (usage) {
+            const promptTokenCount = typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : undefined;
+            const candidatesTokenCount = typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : undefined;
+            if (promptTokenCount !== undefined || candidatesTokenCount !== undefined) {
+                return { promptTokenCount, candidatesTokenCount };
+            }
+        }
 
-        const promptTokenCount = typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : undefined;
-        const candidatesTokenCount = typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : undefined;
+        // Interactions API usage uses a different naming convention.
+        const interactionUsage = record.usage && typeof record.usage === 'object'
+            ? (record.usage as Record<string, unknown>)
+            : undefined;
+        if (!interactionUsage) return {};
+
+        const promptTokenCount = typeof interactionUsage.input_tokens === 'number'
+            ? interactionUsage.input_tokens
+            : (typeof interactionUsage.promptTokenCount === 'number' ? interactionUsage.promptTokenCount : undefined);
+        const candidatesTokenCount = typeof interactionUsage.output_tokens === 'number'
+            ? interactionUsage.output_tokens
+            : (typeof interactionUsage.candidatesTokenCount === 'number' ? interactionUsage.candidatesTokenCount : undefined);
+
         return { promptTokenCount, candidatesTokenCount };
+    }
+
+    private extractInteractionOutput(data: unknown): { text: string; imageDataUrl?: string } {
+        if (!data || typeof data !== 'object') {
+            return { text: '' };
+        }
+
+        const record = data as Record<string, unknown>;
+        const outputs = Array.isArray(record.outputs) ? record.outputs : [];
+        if (outputs.length === 0) {
+            return { text: '' };
+        }
+
+        const textParts: string[] = [];
+        for (const output of outputs) {
+            if (!output || typeof output !== 'object') continue;
+            const item = output as Record<string, unknown>;
+            if (item.type === 'text' && typeof item.text === 'string') {
+                textParts.push(item.text);
+                continue;
+            }
+            if (item.type === 'image' && typeof item.data === 'string') {
+                const mimeType = typeof item.mime_type === 'string' ? item.mime_type : 'image/png';
+                return { text: textParts.join('\n').trim(), imageDataUrl: `data:${mimeType};base64,${item.data}` };
+            }
+        }
+
+        return { text: textParts.join('\n').trim() };
     }
 
     private extractImagePayload(data: unknown): { base64: string; mimeType?: string } {
