@@ -42,6 +42,8 @@ interface MistralStreamChunk {
 
 export class MistralProvider extends BaseProvider {
     private baseUrl = 'https://api.mistral.ai/v1';
+    private readonly retryCount = 2;
+    private readonly retryDelayMs = 400;
 
     constructor(apiKey?: string, timeout?: number) {
         super(apiKey || process.env.MISTRAL_API_KEY || '', timeout);
@@ -60,25 +62,11 @@ export class MistralProvider extends BaseProvider {
         }
 
         try {
-            const response = await this.withTimeout(
-                fetch(`${this.baseUrl}/chat/completions`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${this.apiKey}`,
-                    },
-                    body: JSON.stringify({
-                        model: request.model,
-                        messages: [{ role: 'user', content: request.prompt }],
-                        max_tokens: request.maxTokens || model.maxOutputTokens,
-                    }),
-                })
+            const response = await this.requestChatCompletion(
+                request.model,
+                request.prompt,
+                request.maxTokens || model.maxOutputTokens
             );
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || `HTTP ${response.status}`);
-            }
 
             const data: MistralChatResponse = await response.json();
             const inputTokens = data.usage.prompt_tokens;
@@ -129,8 +117,7 @@ export class MistralProvider extends BaseProvider {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || `HTTP ${response.status}`);
+                throw new Error(await this.readErrorMessage(response));
             }
 
             const reader = response.body?.getReader();
@@ -206,5 +193,73 @@ export class MistralProvider extends BaseProvider {
             return '';
         }
         return '';
+    }
+
+    private async requestChatCompletion(model: string, prompt: string, maxTokens: number): Promise<Response> {
+        let lastError = '';
+
+        for (let attempt = 0; attempt <= this.retryCount; attempt += 1) {
+            const response = await this.withTimeout(
+                fetch(`${this.baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.apiKey}`,
+                    },
+                    body: JSON.stringify({
+                        model,
+                        messages: [{ role: 'user', content: prompt }],
+                        max_tokens: maxTokens,
+                    }),
+                })
+            );
+
+            if (response.ok) return response;
+
+            const errorMessage = await this.readErrorMessage(response);
+            lastError = errorMessage;
+            const retryable = this.isRetryableStatus(response.status, errorMessage);
+            if (!retryable || attempt === this.retryCount) {
+                throw new Error(errorMessage);
+            }
+
+            await this.sleep(this.retryDelayMs * Math.pow(2, attempt));
+        }
+
+        throw new Error(lastError || 'Mistral request failed');
+    }
+
+    private isRetryableStatus(status: number, message: string): boolean {
+        const text = message.toLowerCase();
+        return (
+            status === 429 ||
+            status === 503 ||
+            status === 529 ||
+            text.includes('service unavailable') ||
+            text.includes('temporarily unavailable') ||
+            text.includes('overloaded')
+        );
+    }
+
+    private async readErrorMessage(response: Response): Promise<string> {
+        const fallback = `HTTP ${response.status}: ${response.statusText}`;
+        const raw = await response.text();
+        if (!raw) return fallback;
+
+        try {
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            if (typeof parsed.message === 'string') return parsed.message;
+            const errorObj = parsed.error && typeof parsed.error === 'object'
+                ? (parsed.error as Record<string, unknown>)
+                : undefined;
+            if (typeof errorObj?.message === 'string') return errorObj.message;
+            return fallback;
+        } catch {
+            return raw;
+        }
+    }
+
+    private async sleep(ms: number): Promise<void> {
+        await new Promise(resolve => setTimeout(resolve, ms));
     }
 }
