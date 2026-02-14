@@ -22,6 +22,24 @@ interface SampleRequest {
     apiKeys: Partial<Record<ProviderType, string>>;
 }
 
+function normalizePreviewContent(content: unknown): string {
+    if (typeof content === 'string') return content;
+    if (content == null) return '';
+    if (Array.isArray(content)) {
+        return content.map(item => normalizePreviewContent(item)).filter(Boolean).join('\n');
+    }
+    if (typeof content === 'object') {
+        const record = content as Record<string, unknown>;
+        if (typeof record.text === 'string') return record.text;
+        if (typeof record.content === 'string') return record.content;
+    }
+    try {
+        return JSON.stringify(content);
+    } catch {
+        return String(content);
+    }
+}
+
 function isSupportedInSampleMode(modelId: string): boolean {
     // Realtime models are not compatible with the current sample endpoint flow.
     return !modelId.toLowerCase().includes('realtime');
@@ -146,13 +164,14 @@ export async function POST(request: NextRequest) {
                 }
 
                 const totalCost = inputCost + outputCost;
+                const contentPreview = normalizePreviewContent(response.content);
                 const responsePreview = response.media?.type === 'image'
                     ? `🖼️ ${response.media.url}`
                     : response.media?.type === 'video'
                         ? (response.media.status === 'pending'
                             ? `🎬 Video generation in progress (request_id: ${response.media.requestId})`
                             : `🎬 ${response.media.url || response.content}`)
-                        : response.content.substring(0, 200);
+                        : contentPreview.substring(0, 200);
 
                 const result: SampleResultV2 = {
                     modelId,

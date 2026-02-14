@@ -10,7 +10,7 @@ interface MistralChatResponse {
         index: number;
         message: {
             role: string;
-            content: string;
+            content: unknown;
         };
         finish_reason: string;
     }>;
@@ -29,7 +29,7 @@ interface MistralStreamChunk {
         index: number;
         delta: {
             role?: string;
-            content?: string;
+            content?: unknown;
         };
         finish_reason: string | null;
     }>;
@@ -83,7 +83,7 @@ export class MistralProvider extends BaseProvider {
             const data: MistralChatResponse = await response.json();
             const inputTokens = data.usage.prompt_tokens;
             const outputTokens = data.usage.completion_tokens;
-            const content = data.choices[0]?.message?.content || '';
+            const content = this.extractContentText(data.choices[0]?.message?.content);
             const costs = calculateCost(inputTokens, outputTokens, model);
 
             return {
@@ -159,7 +159,7 @@ export class MistralProvider extends BaseProvider {
 
                         try {
                             const chunk: MistralStreamChunk = JSON.parse(data);
-                            const content = chunk.choices[0]?.delta?.content || '';
+                            const content = this.extractContentText(chunk.choices[0]?.delta?.content);
 
                             if (chunk.usage) {
                                 inputTokens = chunk.usage.prompt_tokens;
@@ -187,5 +187,24 @@ export class MistralProvider extends BaseProvider {
     async countTokens(text: string): Promise<number> {
         // Mistral doesn't have a native token counting API, use estimation
         return Math.ceil((text.length / 4) * 1.2);
+    }
+
+    private extractContentText(content: unknown): string {
+        if (typeof content === 'string') return content;
+        if (Array.isArray(content)) {
+            return content
+                .map(item => this.extractContentText(item))
+                .filter(Boolean)
+                .join('\n')
+                .trim();
+        }
+        if (content && typeof content === 'object') {
+            const record = content as Record<string, unknown>;
+            if (typeof record.text === 'string') return record.text;
+            if (typeof record.content === 'string') return record.content;
+            if (typeof record.value === 'string') return record.value;
+            return '';
+        }
+        return '';
     }
 }
