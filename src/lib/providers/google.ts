@@ -32,36 +32,7 @@ export class GoogleProvider extends BaseProvider {
             if (this.isImagenModel(request.model)) {
                 return await this.completeImagenPredict(request, modelConfig, startTime);
             }
-
-            const model = this.getModel(request.model);
-            const generationConfig = this.getGenerationConfig(request, modelConfig);
-            const result = await this.withTimeout(
-                model.generateContent({
-                    contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
-                    ...(generationConfig ? { generationConfig } : {}),
-                })
-            );
-
-            const response = result.response;
-            const content = response.text();
-            // Parse usage from response
-            const inputTokens = response.usageMetadata?.promptTokenCount || this.estimateTokens(request.prompt);
-            const outputTokens = response.usageMetadata?.candidatesTokenCount || this.estimateTokens(content);
-            const costs = calculateCost(inputTokens, outputTokens, modelConfig);
-
-            return {
-                provider: this.providerType,
-                model: request.model,
-                content,
-                inputTokens,
-                outputTokens,
-                totalTokens: inputTokens + outputTokens,
-                inputCost: costs.inputCost,
-                outputCost: costs.outputCost,
-                totalCost: costs.totalCost,
-                durationMs: Date.now() - startTime,
-                finishReason: 'complete',
-            };
+            return await this.completeGenerateContent(request, modelConfig, startTime);
         } catch (error) {
             throw this.parseError(error, request.model);
         }
@@ -203,6 +174,134 @@ export class GoogleProvider extends BaseProvider {
             durationMs: Date.now() - startTime,
             finishReason: 'complete',
         };
+    }
+
+    private async completeGenerateContent(
+        request: CompletionRequest,
+        modelConfig: NonNullable<ReturnType<typeof getModelById>>,
+        startTime: number
+    ): Promise<CompletionResponse> {
+        const generationConfig = this.getGenerationConfig(request, modelConfig);
+        const response = await this.withTimeout(
+            fetch(`${this.baseUrl}/models/${encodeURIComponent(request.model)}:generateContent`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': this.apiKey,
+                },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+                    ...(generationConfig ? { generationConfig } : {}),
+                }),
+            })
+        );
+
+        if (!response.ok) {
+            throw new Error(await this.parseGoogleErrorResponse(response));
+        }
+
+        const data = await response.json();
+        const output = this.extractGenerateContentOutput(data);
+        const usage = this.extractUsageMetadata(data);
+
+        const inputTokens = usage.promptTokenCount ?? this.estimateTokens(request.prompt);
+        const outputTokens = usage.candidatesTokenCount ?? (output.text ? this.estimateTokens(output.text) : 0);
+        const costs = calculateCost(inputTokens, outputTokens, modelConfig);
+
+        return {
+            provider: this.providerType,
+            model: request.model,
+            content: output.text || output.imageDataUrl || '',
+            media: output.imageDataUrl
+                ? {
+                    type: 'image',
+                    url: output.imageDataUrl,
+                    status: 'completed',
+                }
+                : undefined,
+            inputTokens,
+            outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            inputCost: costs.inputCost,
+            outputCost: costs.outputCost,
+            totalCost: costs.totalCost,
+            durationMs: Date.now() - startTime,
+            finishReason: 'complete',
+        };
+    }
+
+    private async parseGoogleErrorResponse(response: globalThis.Response): Promise<string> {
+        const raw = await response.text();
+        let message = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            const errorObj = parsed.error && typeof parsed.error === 'object'
+                ? (parsed.error as Record<string, unknown>)
+                : undefined;
+            const code = typeof errorObj?.status === 'string'
+                ? errorObj.status
+                : (typeof errorObj?.code === 'number' ? String(errorObj.code) : '');
+            const detail = typeof errorObj?.message === 'string'
+                ? errorObj.message
+                : (typeof parsed.message === 'string' ? parsed.message : message);
+            message = code ? `${code}: ${detail}` : detail;
+        } catch {
+            if (raw) message = raw;
+        }
+        return message;
+    }
+
+    private extractGenerateContentOutput(data: unknown): { text: string; imageDataUrl?: string } {
+        if (!data || typeof data !== 'object') {
+            return { text: '' };
+        }
+
+        const record = data as Record<string, unknown>;
+        const candidates = Array.isArray(record.candidates) ? record.candidates : [];
+        if (candidates.length === 0 || !candidates[0] || typeof candidates[0] !== 'object') {
+            return { text: '' };
+        }
+
+        const candidate = candidates[0] as Record<string, unknown>;
+        const content = candidate.content && typeof candidate.content === 'object'
+            ? (candidate.content as Record<string, unknown>)
+            : undefined;
+        const parts = content && Array.isArray(content.parts) ? content.parts : [];
+
+        const textParts: string[] = [];
+        for (const part of parts) {
+            if (!part || typeof part !== 'object') continue;
+            const recordPart = part as Record<string, unknown>;
+            if (typeof recordPart.text === 'string') {
+                textParts.push(recordPart.text);
+            }
+            const inlineData = recordPart.inlineData && typeof recordPart.inlineData === 'object'
+                ? (recordPart.inlineData as Record<string, unknown>)
+                : undefined;
+            const mimeType = typeof inlineData?.mimeType === 'string' ? inlineData.mimeType : '';
+            const data64 = typeof inlineData?.data === 'string' ? inlineData.data : '';
+            if (mimeType.startsWith('image/') && data64) {
+                return { text: textParts.join('\n').trim(), imageDataUrl: `data:${mimeType};base64,${data64}` };
+            }
+        }
+
+        return { text: textParts.join('\n').trim() };
+    }
+
+    private extractUsageMetadata(data: unknown): { promptTokenCount?: number; candidatesTokenCount?: number } {
+        if (!data || typeof data !== 'object') {
+            return {};
+        }
+
+        const record = data as Record<string, unknown>;
+        const usage = record.usageMetadata && typeof record.usageMetadata === 'object'
+            ? (record.usageMetadata as Record<string, unknown>)
+            : undefined;
+        if (!usage) return {};
+
+        const promptTokenCount = typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : undefined;
+        const candidatesTokenCount = typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : undefined;
+        return { promptTokenCount, candidatesTokenCount };
     }
 
     private extractImagePayload(data: unknown): { base64: string; mimeType?: string } {
