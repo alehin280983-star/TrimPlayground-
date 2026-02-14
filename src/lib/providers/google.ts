@@ -181,23 +181,25 @@ export class GoogleProvider extends BaseProvider {
         const generationConfig = this.getGenerationConfig(request, modelConfig);
         let lastError: string | undefined;
         for (const baseUrl of this.apiBaseUrls) {
-            const response = await this.withTimeout(
-                fetch(`${baseUrl}/models/${encodeURIComponent(request.model)}:generateContent`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': this.apiKey,
-                    },
-                    body: JSON.stringify({
-                        contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
-                        ...(generationConfig ? { generationConfig } : {}),
-                    }),
-                })
-            );
+            let response = await this.requestGenerateContent(baseUrl, request.model, request.prompt, generationConfig);
 
             if (!response.ok) {
-                const parsedError = await this.parseGoogleErrorResponse(response);
+                let parsedError = await this.parseGoogleErrorResponse(response);
                 lastError = parsedError.message;
+
+                if (this.shouldRetryWithMinimalPayload(parsedError.message)) {
+                    const minimalResponse = await this.requestGenerateContent(baseUrl, request.model, request.prompt, undefined, true);
+                    if (minimalResponse.ok) {
+                        response = minimalResponse;
+                    } else {
+                        parsedError = await this.parseGoogleErrorResponse(minimalResponse);
+                        lastError = parsedError.message;
+                    }
+                }
+
+                if (response.ok) {
+                    // Proceed to normal parsing below.
+                } else {
                 if (this.shouldFallbackToStreamGenerate(parsedError.statusCode, parsedError.message, request.model)) {
                     try {
                         return await this.completeViaStreamGenerate(request, modelConfig, startTime, baseUrl);
@@ -210,6 +212,7 @@ export class GoogleProvider extends BaseProvider {
                     continue;
                 }
                 throw new Error(parsedError.message);
+                }
             }
 
             const data = await response.json();
@@ -293,6 +296,39 @@ export class GoogleProvider extends BaseProvider {
         );
     }
 
+    private shouldRetryWithMinimalPayload(message: string): boolean {
+        const text = String(message).toLowerCase();
+        return text.includes("reading 'includes'") || text.includes('internal');
+    }
+
+    private async requestGenerateContent(
+        baseUrl: string,
+        model: string,
+        prompt: string,
+        generationConfig?: { maxOutputTokens: number },
+        minimalPayload = false
+    ): Promise<globalThis.Response> {
+        const body = minimalPayload
+            ? {
+                contents: [{ parts: [{ text: prompt }] }],
+            }
+            : {
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                ...(generationConfig ? { generationConfig } : {}),
+            };
+
+        return this.withTimeout(
+            fetch(`${baseUrl}/models/${encodeURIComponent(model)}:generateContent`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': this.apiKey,
+                },
+                body: JSON.stringify(body),
+            })
+        );
+    }
+
     private async completeViaStreamGenerate(
         request: CompletionRequest,
         modelConfig: NonNullable<ReturnType<typeof getModelById>>,
@@ -308,7 +344,7 @@ export class GoogleProvider extends BaseProvider {
                     'x-goog-api-key': this.apiKey,
                 },
                 body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+                    contents: [{ parts: [{ text: request.prompt }] }],
                     ...(generationConfig ? { generationConfig } : {}),
                 }),
             })
