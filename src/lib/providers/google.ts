@@ -29,12 +29,11 @@ export class GoogleProvider extends BaseProvider {
 
         try {
             const model = this.getModel(request.model);
+            const generationConfig = this.getGenerationConfig(request, modelConfig);
             const result = await this.withTimeout(
                 model.generateContent({
                     contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
-                    generationConfig: {
-                        maxOutputTokens: request.maxTokens || modelConfig.maxOutputTokens,
-                    },
+                    ...(generationConfig ? { generationConfig } : {}),
                 })
             );
 
@@ -74,11 +73,10 @@ export class GoogleProvider extends BaseProvider {
 
         try {
             const model = this.getModel(request.model);
+            const generationConfig = this.getGenerationConfig(request, modelConfig);
             const result = await model.generateContentStream({
                 contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
-                generationConfig: {
-                    maxOutputTokens: request.maxTokens || modelConfig.maxOutputTokens,
-                },
+                ...(generationConfig ? { generationConfig } : {}),
             });
 
             let fullContent = '';
@@ -117,5 +115,16 @@ export class GoogleProvider extends BaseProvider {
     private estimateTokens(text: string): number {
         // Rough estimation: 1 token ≈ 4 characters, with 20% safety margin
         return Math.ceil((text.length / 4) * 1.2);
+    }
+
+    private getGenerationConfig(
+        request: CompletionRequest,
+        modelConfig: NonNullable<ReturnType<typeof getModelById>>
+    ): { maxOutputTokens: number } | undefined {
+        const maxOutputTokens = request.maxTokens ?? modelConfig.maxOutputTokens;
+        if (typeof maxOutputTokens === 'number' && maxOutputTokens > 0) {
+            return { maxOutputTokens };
+        }
+        return undefined;
     }
 }
