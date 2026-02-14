@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/layout';
 import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, OutputControl } from '@/components/playground';
@@ -39,6 +39,12 @@ function getModelCategory(model: ModelConfig): ModelCategory {
     return 'text_code';
 }
 
+function isSampleSupportedModel(model: ModelConfig): boolean {
+    const id = model.id.toLowerCase();
+    // Realtime models require realtime API flow (WS/WebRTC), not sample text-completion flow.
+    return !id.includes('realtime');
+}
+
 export default function PlaygroundPage() {
     const [selectedModels, setSelectedModels] = useState<ModelConfig[]>([]);
     const [prompt, setPrompt] = useState('');
@@ -58,9 +64,15 @@ export default function PlaygroundPage() {
     const [expectedOutput, setExpectedOutput] = useState<number | undefined>(undefined);
 
     const allModels = getAllModels();
+    const visibleModels = mode === 'sample' ? allModels.filter(isSampleSupportedModel) : allModels;
+
+    useEffect(() => {
+        if (mode !== 'sample') return;
+        setSelectedModels(prev => prev.filter(isSampleSupportedModel));
+    }, [mode]);
 
     // Group models by Category -> Provider for the sidebar
-    const modelsByCategory = allModels.reduce((acc, model) => {
+    const modelsByCategory = visibleModels.reduce((acc, model) => {
         const category = getModelCategory(model);
         if (!acc[category]) acc[category] = {} as Record<ProviderType, ModelConfig[]>;
         if (!acc[category][model.provider]) acc[category][model.provider] = [];
@@ -291,7 +303,7 @@ export default function PlaygroundPage() {
                                 ))
                             ) : (
                                 // Placeholder cards if nothing selected, just to match the visual
-                                [allModels[0], allModels[1], allModels[2]].map((model, idx) => (
+                                [visibleModels[0], visibleModels[1], visibleModels[2]].filter(Boolean).map((model, idx) => (
                                     <ModelCard key={model.id} model={model} isFeatured={idx === 1} />
                                 ))
                             )

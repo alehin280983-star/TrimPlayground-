@@ -22,6 +22,11 @@ interface SampleRequest {
     apiKeys: Partial<Record<ProviderType, string>>;
 }
 
+function isSupportedInSampleMode(modelId: string): boolean {
+    // Realtime models are not compatible with the current sample endpoint flow.
+    return !modelId.toLowerCase().includes('realtime');
+}
+
 function createProviderWithKey(providerType: ProviderType, apiKey: string): BaseProvider {
     switch (providerType) {
         case 'openai':
@@ -77,6 +82,28 @@ export async function POST(request: NextRequest) {
             if (!model) continue;
 
             const modality = model.modality ?? 'text';
+
+            if (!isSupportedInSampleMode(modelId)) {
+                results.push({
+                    modelId,
+                    modelName: model.name,
+                    provider: model.provider,
+                    mode: 'sample',
+                    breakdown: {
+                        input: { tokens: 0, cost: 0 },
+                        output: { tokens: 0, cost: 0 },
+                    },
+                    total: { min: 0, median: 0, max: 0 },
+                    confidence: 'low',
+                    warnings: ['Sample mode does not support realtime models. Use Estimate mode for cost checks.'],
+                    calculatedAt: new Date().toISOString(),
+                    actualUsage: { inputTokens: 0, outputTokens: 0 },
+                    actualCost: 0,
+                    responsePreview: '❌ Error: Realtime models are unavailable in sample mode.',
+                    latencyMs: 0,
+                });
+                continue;
+            }
 
             const apiKey = apiKeys[model.provider];
             if (!apiKey) {
