@@ -1577,7 +1577,7 @@ const qwenModels: ModelConfig[] = [
         qualityRating: 4,
     },
     {
-        id: 'qvq-max',
+        id: 'qvq-max-latest',
         name: 'QVQ Max',
         provider: 'alibaba',
         inputPrice: 0.001147, // $1.147 / 1M
@@ -1590,7 +1590,7 @@ const qwenModels: ModelConfig[] = [
         qualityRating: 5,
     },
     {
-        id: 'qvq-plus',
+        id: 'qvq-plus-latest',
         name: 'QVQ Plus',
         provider: 'alibaba',
         inputPrice: 0.000287, // $0.287 / 1M
