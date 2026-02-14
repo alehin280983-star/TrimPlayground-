@@ -1110,7 +1110,7 @@ const mistralModels: ModelConfig[] = [
         qualityRating: 4,
     },
     {
-        id: 'mistral-nemo',
+        id: 'open-mistral-nemo-2407',
         name: 'Mistral Nemo',
         provider: 'mistral',
         inputPrice: 0.00015, // $0.15 / 1M

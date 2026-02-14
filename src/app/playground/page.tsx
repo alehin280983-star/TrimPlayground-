@@ -42,7 +42,10 @@ function getModelCategory(model: ModelConfig): ModelCategory {
 function isSampleSupportedModel(model: ModelConfig): boolean {
     const id = model.id.toLowerCase();
     // Realtime models require realtime API flow (WS/WebRTC), not sample text-completion flow.
-    return !id.includes('realtime');
+    if (id.includes('realtime')) return false;
+    // OCR models require image/document input and a dedicated OCR endpoint.
+    if (id.includes('ocr')) return false;
+    return true;
 }
 
 export default function PlaygroundPage() {

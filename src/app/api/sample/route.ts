@@ -41,8 +41,12 @@ function normalizePreviewContent(content: unknown): string {
 }
 
 function isSupportedInSampleMode(modelId: string): boolean {
+    const id = modelId.toLowerCase();
     // Realtime models are not compatible with the current sample endpoint flow.
-    return !modelId.toLowerCase().includes('realtime');
+    if (id.includes('realtime')) return false;
+    // OCR models require file/image input via OCR-specific API flow.
+    if (id.includes('ocr')) return false;
+    return true;
 }
 
 function createProviderWithKey(providerType: ProviderType, apiKey: string): BaseProvider {
@@ -102,6 +106,9 @@ export async function POST(request: NextRequest) {
             const modality = model.modality ?? 'text';
 
             if (!isSupportedInSampleMode(modelId)) {
+                const unsupportedReason = modelId.toLowerCase().includes('ocr')
+                    ? 'Sample mode does not support OCR models. OCR requires image/document input.'
+                    : 'Sample mode does not support realtime models. Use Estimate mode for cost checks.';
                 results.push({
                     modelId,
                     modelName: model.name,
@@ -113,11 +120,11 @@ export async function POST(request: NextRequest) {
                     },
                     total: { min: 0, median: 0, max: 0 },
                     confidence: 'low',
-                    warnings: ['Sample mode does not support realtime models. Use Estimate mode for cost checks.'],
+                    warnings: [unsupportedReason],
                     calculatedAt: new Date().toISOString(),
                     actualUsage: { inputTokens: 0, outputTokens: 0 },
                     actualCost: 0,
-                    responsePreview: '❌ Error: Realtime models are unavailable in sample mode.',
+                    responsePreview: `❌ Error: ${unsupportedReason}`,
                     latencyMs: 0,
                 });
                 continue;
