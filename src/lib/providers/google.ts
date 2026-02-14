@@ -197,7 +197,11 @@ export class GoogleProvider extends BaseProvider {
         );
 
         if (!response.ok) {
-            throw new Error(await this.parseGoogleErrorResponse(response));
+            const parsedError = await this.parseGoogleErrorResponse(response);
+            if (this.shouldFallbackToStreamGenerate(response.status, parsedError.message, request.model)) {
+                return this.completeViaStreamGenerate(request, modelConfig, startTime);
+            }
+            throw new Error(parsedError.message);
         }
 
         const data = await response.json();
@@ -230,9 +234,10 @@ export class GoogleProvider extends BaseProvider {
         };
     }
 
-    private async parseGoogleErrorResponse(response: globalThis.Response): Promise<string> {
+    private async parseGoogleErrorResponse(response: globalThis.Response): Promise<{ message: string; statusCode: number; status: string }> {
         const raw = await response.text();
         let message = `HTTP ${response.status}: ${response.statusText}`;
+        let status = '';
         try {
             const parsed = JSON.parse(raw) as Record<string, unknown>;
             const errorObj = parsed.error && typeof parsed.error === 'object'
@@ -241,6 +246,7 @@ export class GoogleProvider extends BaseProvider {
             const code = typeof errorObj?.status === 'string'
                 ? errorObj.status
                 : (typeof errorObj?.code === 'number' ? String(errorObj.code) : '');
+            status = code;
             const detail = typeof errorObj?.message === 'string'
                 ? errorObj.message
                 : (typeof parsed.message === 'string' ? parsed.message : message);
@@ -248,7 +254,114 @@ export class GoogleProvider extends BaseProvider {
         } catch {
             if (raw) message = raw;
         }
-        return message;
+        return { message, statusCode: response.status, status };
+    }
+
+    private shouldFallbackToStreamGenerate(statusCode: number, message: string, modelId: string): boolean {
+        const text = String(message).toLowerCase();
+        const id = modelId.toLowerCase();
+        if (id.includes('imagen-')) return false;
+        return (
+            statusCode >= 500 ||
+            text.includes("reading 'includes'") ||
+            text.includes('internal') ||
+            text.includes('unavailable') ||
+            text.includes('overloaded')
+        );
+    }
+
+    private async completeViaStreamGenerate(
+        request: CompletionRequest,
+        modelConfig: NonNullable<ReturnType<typeof getModelById>>,
+        startTime: number
+    ): Promise<CompletionResponse> {
+        const generationConfig = this.getGenerationConfig(request, modelConfig);
+        const response = await this.withTimeout(
+            fetch(`${this.baseUrl}/models/${encodeURIComponent(request.model)}:streamGenerateContent?alt=sse`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': this.apiKey,
+                },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+                    ...(generationConfig ? { generationConfig } : {}),
+                }),
+            })
+        );
+
+        if (!response.ok) {
+            const parsedError = await this.parseGoogleErrorResponse(response);
+            throw new Error(parsedError.message);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+            throw new Error('Google stream response body is not readable');
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullText = '';
+        let imageDataUrl: string | undefined;
+        let promptTokenCount: number | undefined;
+        let candidatesTokenCount: number | undefined;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const payload = line.slice(5).trim();
+                if (!payload) continue;
+                if (payload === '[DONE]') continue;
+
+                let parsed: unknown;
+                try {
+                    parsed = JSON.parse(payload);
+                } catch {
+                    continue;
+                }
+
+                const output = this.extractGenerateContentOutput(parsed);
+                if (output.text) fullText += output.text;
+                if (output.imageDataUrl) imageDataUrl = output.imageDataUrl;
+
+                const usage = this.extractUsageMetadata(parsed);
+                if (typeof usage.promptTokenCount === 'number') promptTokenCount = usage.promptTokenCount;
+                if (typeof usage.candidatesTokenCount === 'number') candidatesTokenCount = usage.candidatesTokenCount;
+            }
+        }
+
+        const inputTokens = promptTokenCount ?? this.estimateTokens(request.prompt);
+        const outputTokens = candidatesTokenCount ?? (fullText ? this.estimateTokens(fullText) : 0);
+        const costs = calculateCost(inputTokens, outputTokens, modelConfig);
+
+        return {
+            provider: this.providerType,
+            model: request.model,
+            content: fullText || imageDataUrl || '',
+            media: imageDataUrl
+                ? {
+                    type: 'image',
+                    url: imageDataUrl,
+                    status: 'completed',
+                }
+                : undefined,
+            inputTokens,
+            outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            inputCost: costs.inputCost,
+            outputCost: costs.outputCost,
+            totalCost: costs.totalCost,
+            durationMs: Date.now() - startTime,
+            finishReason: 'complete',
+        };
     }
 
     private extractGenerateContentOutput(data: unknown): { text: string; imageDataUrl?: string } {
