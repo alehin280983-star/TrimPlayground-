@@ -2092,16 +2092,56 @@ export function calculateCost(
     let inputPrice = model.inputPrice;
     let outputPrice = model.outputPrice;
 
-    // Handle Tiered Pricing (e.g. Qwen)
+    // Handle tiered pricing formats:
+    // - "0-256K"
+    // - "<=200K tokens"
+    // - ">200K tokens"
     if (model.pricingTiers && model.pricingTiers.length > 0) {
-        // Find appropriate tier based on context length (input + output)
+        const parseTokenCount = (value: string): number => {
+            const cleaned = value
+                .toUpperCase()
+                .replace(/TOKENS?/g, '')
+                .replace(/\s+/g, '')
+                .trim();
+            const match = cleaned.match(/^(\d+(?:\.\d+)?)([KM])?$/);
+            if (!match) return Number.NaN;
+            const amount = parseFloat(match[1]);
+            const unit = match[2];
+            if (unit === 'K') return Math.round(amount * 1000);
+            if (unit === 'M') return Math.round(amount * 1000000);
+            return Math.round(amount);
+        };
+
+        const parseTierRange = (range: string): { min: number; max: number } | null => {
+            const raw = range.trim();
+
+            if (raw.includes('-')) {
+                const [minRaw, maxRaw] = raw.split('-', 2);
+                const min = parseTokenCount(minRaw);
+                const max = parseTokenCount(maxRaw);
+                if (Number.isNaN(min) || Number.isNaN(max)) return null;
+                return { min, max };
+            }
+
+            const comparatorMatch = raw.match(/^(<=|<|>=|>)(.+)$/);
+            if (!comparatorMatch) return null;
+
+            const operator = comparatorMatch[1];
+            const boundary = parseTokenCount(comparatorMatch[2]);
+            if (Number.isNaN(boundary)) return null;
+
+            if (operator === '<=') return { min: 0, max: boundary };
+            if (operator === '<') return { min: 0, max: Math.max(0, boundary - 1) };
+            if (operator === '>=') return { min: boundary, max: Infinity };
+            return { min: boundary + 1, max: Infinity }; // '>'
+        };
+
+        // Find appropriate tier based on input context length
         const totalContext = inputTokens; // Tiers usually refer to input context length
         for (const tier of model.pricingTiers) {
-            const [minStr, maxStr] = tier.range.split('-');
-            const min = parseInt(minStr.replace('K', '000').replace('M', '000000'));
-            const max = maxStr.includes('K')
-                ? parseInt(maxStr.replace('K', '000'))
-                : (maxStr.includes('M') ? parseInt(maxStr.replace('M', '000000')) : Infinity);
+            const parsedRange = parseTierRange(tier.range);
+            if (!parsedRange) continue;
+            const { min, max } = parsedRange;
 
             if (totalContext >= min && totalContext <= max) {
                 inputPrice = tier.inputPrice;
