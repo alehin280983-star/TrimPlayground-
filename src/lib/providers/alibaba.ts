@@ -35,10 +35,14 @@ export class AlibabaProvider extends BaseProvider {
 
         let lastError: unknown;
         const generationPath = this.getGenerationPath(model);
-        const requestBody = this.buildRequestBody(request, model);
 
         for (const baseUrl of this.baseUrls) {
             try {
+                if (this.isStreamingOnlyModel(model)) {
+                    return await this.completeViaSSE(request, model, baseUrl, generationPath, startTime);
+                }
+
+                const requestBody = this.buildRequestBody(request, model);
                 const response = await this.withTimeout(
                     fetch(`${baseUrl}${generationPath}`, {
                         method: 'POST',
@@ -49,15 +53,14 @@ export class AlibabaProvider extends BaseProvider {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    const message = errorData.message || errorData.code || `HTTP ${response.status}: ${response.statusText}`;
+                    const { message, code } = this.extractErrorDetails(errorData, response.status, response.statusText);
 
-                    // DashScope keys are region-bound; retry on auth-like failures on another endpoint.
-                    if (this.isAuthLikeError(response.status, message) && baseUrl !== this.baseUrls[this.baseUrls.length - 1]) {
-                        lastError = new Error(`${message} (endpoint: ${baseUrl})`);
+                    if (this.shouldRetryOnAnotherEndpoint(response.status, message, code) && baseUrl !== this.baseUrls[this.baseUrls.length - 1]) {
+                        lastError = new Error(`[${response.status}] ${code ? `${code}: ` : ''}${message} (endpoint: ${baseUrl})`);
                         continue;
                     }
 
-                    throw new Error(message);
+                    throw new Error(`[${response.status}] ${code ? `${code}: ` : ''}${message}`);
                 }
 
                 const data = await response.json();
@@ -203,6 +206,46 @@ export class AlibabaProvider extends BaseProvider {
         );
     }
 
+    private shouldRetryOnAnotherEndpoint(status: number, message: string, code: string): boolean {
+        const normalizedMessage = String(message).toLowerCase();
+        const normalizedCode = String(code).toLowerCase();
+
+        if (this.isAuthLikeError(status, normalizedMessage)) return true;
+
+        // Some DashScope regions respond with "model not exist/access denied" for models
+        // that are available on another regional endpoint.
+        return (
+            normalizedMessage.includes('model not exist') ||
+            normalizedMessage.includes('model access denied') ||
+            normalizedMessage.includes('access denied') ||
+            normalizedMessage.includes('no permission') ||
+            normalizedCode.includes('model_not_found') ||
+            normalizedCode.includes('modelnotfound') ||
+            normalizedCode.includes('accessdenied')
+        );
+    }
+
+    private extractErrorDetails(
+        errorData: unknown,
+        status: number,
+        statusText: string
+    ): { message: string; code: string } {
+        const data = errorData && typeof errorData === 'object' ? (errorData as Record<string, unknown>) : {};
+        const message = typeof data.message === 'string'
+            ? data.message
+            : (typeof data.error_msg === 'string' ? data.error_msg : `HTTP ${status}: ${statusText}`);
+        const code = typeof data.code === 'string'
+            ? data.code
+            : (typeof data.error_code === 'string' ? data.error_code : '');
+
+        return { message, code };
+    }
+
+    private isStreamingOnlyModel(model: NonNullable<ReturnType<typeof getModelById>>): boolean {
+        const id = model.id.toLowerCase();
+        return id.includes('qvq');
+    }
+
     private getGenerationPath(model: NonNullable<ReturnType<typeof getModelById>>): string {
         return this.isMultimodalModel(model)
             ? '/services/aigc/multimodal-generation/generation'
@@ -246,6 +289,81 @@ export class AlibabaProvider extends BaseProvider {
                 messages: [{ role: 'user', content }],
             },
             parameters: baseParameters,
+        };
+    }
+
+    private async completeViaSSE(
+        request: CompletionRequest,
+        model: NonNullable<ReturnType<typeof getModelById>>,
+        baseUrl: string,
+        generationPath: string,
+        startTime: number
+    ): Promise<CompletionResponse> {
+        const response = await this.withTimeout(
+            fetch(`${baseUrl}${generationPath}`, {
+                method: 'POST',
+                headers: this.buildHeaders({ 'X-DashScope-SSE': 'enable' }),
+                body: JSON.stringify(this.buildRequestBody(request, model, true)),
+            })
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const { message, code } = this.extractErrorDetails(errorData, response.status, response.statusText);
+            throw new Error(`[${response.status}] ${code ? `${code}: ` : ''}${message}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+            throw new Error('SSE response body is not readable');
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullContent = '';
+        let inputTokens = 0;
+        let outputTokens = 0;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const dataLine = line.slice(5).trim();
+                if (!dataLine || dataLine === '[DONE]') continue;
+
+                const parsed = JSON.parse(dataLine) as Record<string, unknown>;
+                const piece = this.extractTextContent(parsed);
+                if (piece) fullContent += piece;
+
+                const usage = this.getObject(parsed, 'usage');
+                if (usage) {
+                    const inTokens = usage.input_tokens;
+                    const outTokens = usage.output_tokens;
+                    if (typeof inTokens === 'number') inputTokens = inTokens;
+                    if (typeof outTokens === 'number') outputTokens = outTokens;
+                }
+            }
+        }
+
+        const costs = calculateCost(inputTokens, outputTokens, model);
+        return {
+            provider: this.providerType,
+            model: request.model,
+            content: fullContent,
+            inputTokens,
+            outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            inputCost: costs.inputCost,
+            outputCost: costs.outputCost,
+            totalCost: costs.totalCost,
+            durationMs: Date.now() - startTime,
+            finishReason: 'complete',
         };
     }
 
