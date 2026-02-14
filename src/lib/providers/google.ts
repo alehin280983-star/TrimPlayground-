@@ -5,7 +5,10 @@ import { getModelById, calculateCost } from '@/lib/config';
 
 export class GoogleProvider extends BaseProvider {
     private client: GoogleGenerativeAI;
-    private readonly baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+    private readonly apiBaseUrls = [
+        'https://generativelanguage.googleapis.com/v1beta',
+        'https://generativelanguage.googleapis.com/v1',
+    ];
 
     constructor(apiKey?: string, timeout?: number) {
         super(apiKey || process.env.GOOGLE_AI_API_KEY || '', timeout);
@@ -113,67 +116,61 @@ export class GoogleProvider extends BaseProvider {
         modelConfig: NonNullable<ReturnType<typeof getModelById>>,
         startTime: number
     ): Promise<CompletionResponse> {
-        const response = await this.withTimeout(
-            fetch(`${this.baseUrl}/models/${encodeURIComponent(request.model)}:predict`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': this.apiKey,
-                },
-                body: JSON.stringify({
-                    instances: [{ prompt: request.prompt }],
-                    parameters: { sampleCount: 1 },
-                }),
-            })
-        );
+        let lastError: string | undefined;
+        for (const baseUrl of this.apiBaseUrls) {
+            const response = await this.withTimeout(
+                fetch(`${baseUrl}/models/${encodeURIComponent(request.model)}:predict`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': this.apiKey,
+                    },
+                    body: JSON.stringify({
+                        instances: [{ prompt: request.prompt }],
+                        parameters: { sampleCount: 1 },
+                    }),
+                })
+            );
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            let message = `HTTP ${response.status}: ${response.statusText}`;
-            try {
-                const parsed = JSON.parse(errorText) as Record<string, unknown>;
-                const errorObj = parsed.error && typeof parsed.error === 'object'
-                    ? (parsed.error as Record<string, unknown>)
-                    : undefined;
-                if (typeof errorObj?.message === 'string') {
-                    message = errorObj.message;
-                } else if (typeof parsed.message === 'string') {
-                    message = parsed.message;
+            if (!response.ok) {
+                const parsedError = await this.parseGoogleErrorResponse(response);
+                lastError = parsedError.message;
+                if (this.shouldTryNextApiVersion(parsedError.statusCode, parsedError.message, request.model)) {
+                    continue;
                 }
-            } catch {
-                if (errorText) message = errorText;
+                throw new Error(parsedError.message);
             }
-            throw new Error(message);
+
+            const data = await response.json();
+            const extracted = this.extractImagePayload(data);
+            if (!extracted.base64) {
+                throw new Error('Imagen response did not contain image bytes');
+            }
+
+            const mimeType = extracted.mimeType || 'image/png';
+            const imageUrl = `data:${mimeType};base64,${extracted.base64}`;
+            const fixedCost = modelConfig.inputPrice;
+
+            return {
+                provider: this.providerType,
+                model: request.model,
+                content: imageUrl,
+                media: {
+                    type: 'image',
+                    url: imageUrl,
+                    status: 'completed',
+                },
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                inputCost: fixedCost,
+                outputCost: 0,
+                totalCost: fixedCost,
+                durationMs: Date.now() - startTime,
+                finishReason: 'complete',
+            };
         }
-
-        const data = await response.json();
-        const extracted = this.extractImagePayload(data);
-        if (!extracted.base64) {
-            throw new Error('Imagen response did not contain image bytes');
-        }
-
-        const mimeType = extracted.mimeType || 'image/png';
-        const imageUrl = `data:${mimeType};base64,${extracted.base64}`;
-        const fixedCost = modelConfig.inputPrice;
-
-        return {
-            provider: this.providerType,
-            model: request.model,
-            content: imageUrl,
-            media: {
-                type: 'image',
-                url: imageUrl,
-                status: 'completed',
-            },
-            inputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
-            inputCost: fixedCost,
-            outputCost: 0,
-            totalCost: fixedCost,
-            durationMs: Date.now() - startTime,
-            finishReason: 'complete',
-        };
+        throw new Error(lastError || 'Imagen request failed on all Google API versions');
     }
 
     private async completeGenerateContent(
@@ -182,56 +179,69 @@ export class GoogleProvider extends BaseProvider {
         startTime: number
     ): Promise<CompletionResponse> {
         const generationConfig = this.getGenerationConfig(request, modelConfig);
-        const response = await this.withTimeout(
-            fetch(`${this.baseUrl}/models/${encodeURIComponent(request.model)}:generateContent`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': this.apiKey,
-                },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
-                    ...(generationConfig ? { generationConfig } : {}),
-                }),
-            })
-        );
+        let lastError: string | undefined;
+        for (const baseUrl of this.apiBaseUrls) {
+            const response = await this.withTimeout(
+                fetch(`${baseUrl}/models/${encodeURIComponent(request.model)}:generateContent`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': this.apiKey,
+                    },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+                        ...(generationConfig ? { generationConfig } : {}),
+                    }),
+                })
+            );
 
-        if (!response.ok) {
-            const parsedError = await this.parseGoogleErrorResponse(response);
-            if (this.shouldFallbackToStreamGenerate(response.status, parsedError.message, request.model)) {
-                return this.completeViaStreamGenerate(request, modelConfig, startTime);
-            }
-            throw new Error(parsedError.message);
-        }
-
-        const data = await response.json();
-        const output = this.extractGenerateContentOutput(data);
-        const usage = this.extractUsageMetadata(data);
-
-        const inputTokens = usage.promptTokenCount ?? this.estimateTokens(request.prompt);
-        const outputTokens = usage.candidatesTokenCount ?? (output.text ? this.estimateTokens(output.text) : 0);
-        const costs = calculateCost(inputTokens, outputTokens, modelConfig);
-
-        return {
-            provider: this.providerType,
-            model: request.model,
-            content: output.text || output.imageDataUrl || '',
-            media: output.imageDataUrl
-                ? {
-                    type: 'image',
-                    url: output.imageDataUrl,
-                    status: 'completed',
+            if (!response.ok) {
+                const parsedError = await this.parseGoogleErrorResponse(response);
+                lastError = parsedError.message;
+                if (this.shouldFallbackToStreamGenerate(parsedError.statusCode, parsedError.message, request.model)) {
+                    try {
+                        return await this.completeViaStreamGenerate(request, modelConfig, startTime, baseUrl);
+                    } catch (streamError) {
+                        const streamMessage = streamError instanceof Error ? streamError.message : String(streamError);
+                        lastError = streamMessage;
+                    }
                 }
-                : undefined,
-            inputTokens,
-            outputTokens,
-            totalTokens: inputTokens + outputTokens,
-            inputCost: costs.inputCost,
-            outputCost: costs.outputCost,
-            totalCost: costs.totalCost,
-            durationMs: Date.now() - startTime,
-            finishReason: 'complete',
-        };
+                if (this.shouldTryNextApiVersion(parsedError.statusCode, parsedError.message, request.model)) {
+                    continue;
+                }
+                throw new Error(parsedError.message);
+            }
+
+            const data = await response.json();
+            const output = this.extractGenerateContentOutput(data);
+            const usage = this.extractUsageMetadata(data);
+
+            const inputTokens = usage.promptTokenCount ?? this.estimateTokens(request.prompt);
+            const outputTokens = usage.candidatesTokenCount ?? (output.text ? this.estimateTokens(output.text) : 0);
+            const costs = calculateCost(inputTokens, outputTokens, modelConfig);
+
+            return {
+                provider: this.providerType,
+                model: request.model,
+                content: output.text || output.imageDataUrl || '',
+                media: output.imageDataUrl
+                    ? {
+                        type: 'image',
+                        url: output.imageDataUrl,
+                        status: 'completed',
+                    }
+                    : undefined,
+                inputTokens,
+                outputTokens,
+                totalTokens: inputTokens + outputTokens,
+                inputCost: costs.inputCost,
+                outputCost: costs.outputCost,
+                totalCost: costs.totalCost,
+                durationMs: Date.now() - startTime,
+                finishReason: 'complete',
+            };
+        }
+        throw new Error(lastError || 'Google generateContent failed on all API versions');
     }
 
     private async parseGoogleErrorResponse(response: globalThis.Response): Promise<{ message: string; statusCode: number; status: string }> {
@@ -270,14 +280,28 @@ export class GoogleProvider extends BaseProvider {
         );
     }
 
+    private shouldTryNextApiVersion(statusCode: number, message: string, modelId: string): boolean {
+        const text = String(message).toLowerCase();
+        const id = modelId.toLowerCase();
+        if (id.includes('imagen-')) return statusCode >= 500 || text.includes('internal') || text.includes('not found');
+        return (
+            statusCode >= 500 ||
+            text.includes("reading 'includes'") ||
+            text.includes('internal') ||
+            text.includes('not found') ||
+            text.includes('model') && text.includes('not') && text.includes('supported')
+        );
+    }
+
     private async completeViaStreamGenerate(
         request: CompletionRequest,
         modelConfig: NonNullable<ReturnType<typeof getModelById>>,
-        startTime: number
+        startTime: number,
+        baseUrl: string
     ): Promise<CompletionResponse> {
         const generationConfig = this.getGenerationConfig(request, modelConfig);
         const response = await this.withTimeout(
-            fetch(`${this.baseUrl}/models/${encodeURIComponent(request.model)}:streamGenerateContent?alt=sse`, {
+            fetch(`${baseUrl}/models/${encodeURIComponent(request.model)}:streamGenerateContent?alt=sse`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
