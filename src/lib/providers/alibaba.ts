@@ -34,23 +34,16 @@ export class AlibabaProvider extends BaseProvider {
         }
 
         let lastError: unknown;
+        const generationPath = this.getGenerationPath(model);
+        const requestBody = this.buildRequestBody(request, model);
 
         for (const baseUrl of this.baseUrls) {
             try {
                 const response = await this.withTimeout(
-                    fetch(`${baseUrl}/services/aigc/text-generation/generation`, {
+                    fetch(`${baseUrl}${generationPath}`, {
                         method: 'POST',
                         headers: this.buildHeaders(),
-                        body: JSON.stringify({
-                            model: request.model,
-                            input: {
-                                messages: [{ role: 'user', content: request.prompt }],
-                            },
-                            parameters: {
-                                max_tokens: request.maxTokens || model.maxOutputTokens,
-                                temperature: 0.7,
-                            },
-                        }),
+                        body: JSON.stringify(requestBody),
                     })
                 );
 
@@ -70,7 +63,7 @@ export class AlibabaProvider extends BaseProvider {
                 const data = await response.json();
                 const inputTokens = data.usage?.input_tokens || 0;
                 const outputTokens = data.usage?.output_tokens || 0;
-                const content = data.output?.text || data.output?.choices?.[0]?.message?.content || '';
+                const content = this.extractTextContent(data);
                 const costs = calculateCost(inputTokens, outputTokens, model);
 
                 return {
@@ -115,20 +108,10 @@ export class AlibabaProvider extends BaseProvider {
         }
 
         try {
-            const response = await fetch(`${this.baseUrls[0]}/services/aigc/text-generation/generation`, {
+            const response = await fetch(`${this.baseUrls[0]}${this.getGenerationPath(model)}`, {
                 method: 'POST',
                 headers: this.buildHeaders({ 'X-DashScope-SSE': 'enable' }),
-                body: JSON.stringify({
-                    model: request.model,
-                    input: {
-                        messages: [{ role: 'user', content: request.prompt }],
-                    },
-                    parameters: {
-                        max_tokens: request.maxTokens || model.maxOutputTokens,
-                        temperature: 0.7,
-                        incremental_output: true,
-                    },
-                }),
+                body: JSON.stringify(this.buildRequestBody(request, model, true)),
             });
 
             if (!response.ok) {
@@ -159,7 +142,7 @@ export class AlibabaProvider extends BaseProvider {
 
                         try {
                             const parsed = JSON.parse(data);
-                            const content = parsed.output?.text || '';
+                            const content = this.extractTextContent(parsed);
                             const isDone = parsed.output?.finish_reason === 'stop';
 
                             if (parsed.usage) {
@@ -218,5 +201,93 @@ export class AlibabaProvider extends BaseProvider {
             normalized.includes('unauthorized') ||
             normalized.includes('forbidden')
         );
+    }
+
+    private getGenerationPath(model: NonNullable<ReturnType<typeof getModelById>>): string {
+        return this.isMultimodalModel(model)
+            ? '/services/aigc/multimodal-generation/generation'
+            : '/services/aigc/text-generation/generation';
+    }
+
+    private isMultimodalModel(model: NonNullable<ReturnType<typeof getModelById>>): boolean {
+        if (model.modality === 'image' || model.modality === 'video' || model.modality === 'audio') {
+            return true;
+        }
+
+        const id = model.id.toLowerCase();
+        return (
+            id.includes('qvq') ||
+            id.includes('qwen-vl') ||
+            id.includes('qwen3-vl') ||
+            id.includes('omni')
+        );
+    }
+
+    private buildRequestBody(
+        request: CompletionRequest,
+        model: NonNullable<ReturnType<typeof getModelById>>,
+        streaming = false
+    ): Record<string, unknown> {
+        const baseParameters: Record<string, unknown> = {
+            max_tokens: request.maxTokens || model.maxOutputTokens,
+            temperature: 0.7,
+        };
+
+        if (streaming) {
+            baseParameters.incremental_output = true;
+        }
+
+        const multimodal = this.isMultimodalModel(model);
+        const content = multimodal ? [{ text: request.prompt }] : request.prompt;
+
+        return {
+            model: request.model,
+            input: {
+                messages: [{ role: 'user', content }],
+            },
+            parameters: baseParameters,
+        };
+    }
+
+    private extractTextContent(data: unknown): string {
+        const output = this.getObject(data, 'output');
+        const directText = this.getString(output, 'text');
+        if (typeof directText === 'string') return directText;
+
+        const choices = this.getArray(output, 'choices');
+        const firstChoice = choices.length > 0 ? choices[0] : undefined;
+        const message = this.getObject(firstChoice, 'message');
+        const messageContent = message ? message.content : undefined;
+        if (typeof messageContent === 'string') return messageContent;
+
+        if (Array.isArray(messageContent)) {
+            const textParts = messageContent
+                .map(part => this.getString(part, 'text') || '')
+                .filter(Boolean);
+            return textParts.join('\n');
+        }
+
+        return '';
+    }
+
+    private getObject(value: unknown, key: string): Record<string, unknown> | undefined {
+        if (!value || typeof value !== 'object') return undefined;
+        const record = value as Record<string, unknown>;
+        const next = record[key];
+        if (!next || typeof next !== 'object') return undefined;
+        return next as Record<string, unknown>;
+    }
+
+    private getString(value: unknown, key: string): string | undefined {
+        if (!value || typeof value !== 'object') return undefined;
+        const record = value as Record<string, unknown>;
+        const candidate = record[key];
+        return typeof candidate === 'string' ? candidate : undefined;
+    }
+
+    private getArray(value: unknown, key: string): unknown[] {
+        if (!value || typeof value !== 'object') return [];
+        const record = value as Record<string, unknown>;
+        return Array.isArray(record[key]) ? (record[key] as unknown[]) : [];
     }
 }
