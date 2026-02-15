@@ -34,6 +34,7 @@ export class AlibabaProvider extends BaseProvider {
         }
 
         let lastError: unknown;
+        let preferredError: Error | null = null;
         const generationPath = this.getGenerationPath(model);
 
         for (const baseUrl of this.baseUrls) {
@@ -54,9 +55,11 @@ export class AlibabaProvider extends BaseProvider {
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     const { message, code } = this.extractErrorDetails(errorData, response.status, response.statusText);
+                    const endpointError = new Error(`[${response.status}] ${code ? `${code}: ` : ''}${message} (endpoint: ${baseUrl})`);
+                    preferredError = this.preferAlibabaError(preferredError, endpointError);
 
                     if (this.shouldRetryOnAnotherEndpoint(response.status, message, code) && baseUrl !== this.baseUrls[this.baseUrls.length - 1]) {
-                        lastError = new Error(`[${response.status}] ${code ? `${code}: ` : ''}${message} (endpoint: ${baseUrl})`);
+                        lastError = endpointError;
                         continue;
                     }
 
@@ -84,6 +87,9 @@ export class AlibabaProvider extends BaseProvider {
                 };
             } catch (error) {
                 lastError = error;
+                if (error instanceof Error) {
+                    preferredError = this.preferAlibabaError(preferredError, error);
+                }
                 const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
                 const shouldTryNext =
                     baseUrl !== this.baseUrls[this.baseUrls.length - 1] &&
@@ -98,7 +104,7 @@ export class AlibabaProvider extends BaseProvider {
             }
         }
 
-        throw this.parseError(lastError, request.model);
+        throw this.parseError(preferredError ?? lastError, request.model);
     }
 
     async *streamComplete(
@@ -239,6 +245,39 @@ export class AlibabaProvider extends BaseProvider {
             : (typeof data.error_code === 'string' ? data.error_code : '');
 
         return { message, code };
+    }
+
+    private preferAlibabaError(current: Error | null, next: Error): Error {
+        if (!current) return next;
+
+        const currentScore = this.getAlibabaErrorPriority(current.message);
+        const nextScore = this.getAlibabaErrorPriority(next.message);
+        if (nextScore > currentScore) return next;
+        return current;
+    }
+
+    private getAlibabaErrorPriority(message: string): number {
+        const normalized = message.toLowerCase();
+        if (
+            normalized.includes('model access denied') ||
+            normalized.includes('model not exist') ||
+            normalized.includes('model_not_found') ||
+            normalized.includes('modelnotfound') ||
+            normalized.includes('no permission') ||
+            normalized.includes('access denied')
+        ) return 4;
+
+        if (normalized.includes('rate limit') || normalized.includes('429')) return 3;
+
+        if (
+            normalized.includes('invalid api key') ||
+            normalized.includes('unauthorized') ||
+            normalized.includes('forbidden') ||
+            normalized.includes('401') ||
+            normalized.includes('403')
+        ) return 1;
+
+        return 2;
     }
 
     private isStreamingOnlyModel(model: NonNullable<ReturnType<typeof getModelById>>): boolean {
