@@ -360,6 +360,15 @@ export class GoogleProvider extends BaseProvider {
         }
 
         if (lastError) {
+            const isVeoModel = modelId.toLowerCase().startsWith('veo-');
+            if (isVeoModel && lastError.statusCode === 404) {
+                throw this.createGoogleApiError(
+                    `Veo model ${modelId} is unavailable for this API key/project. ` +
+                    'Veo models require Gemini API paid tier access (billing enabled) and supported region availability.',
+                    lastError.statusCode,
+                    lastError.status
+                );
+            }
             throw this.createGoogleApiError(lastError.message, lastError.statusCode, lastError.status);
         }
 
