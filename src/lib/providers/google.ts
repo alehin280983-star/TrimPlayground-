@@ -332,7 +332,7 @@ export class GoogleProvider extends BaseProvider {
         prompt: string
     ): Promise<{ operationName: string | null; payload: unknown }> {
         const modelCandidates = this.getVideoModelCandidates(modelId);
-        let lastError: { message: string; statusCode: number; status: string } | null = null;
+        let preferredError: { message: string; statusCode: number; status: string } | null = null;
 
         for (const candidateModel of modelCandidates) {
             const attempts = this.buildVideoStartAttempts(baseUrl, candidateModel, prompt);
@@ -349,7 +349,8 @@ export class GoogleProvider extends BaseProvider {
                 );
 
                 if (!response.ok) {
-                    lastError = await this.parseGoogleErrorResponse(response);
+                    const parsedError = await this.parseGoogleErrorResponse(response);
+                    preferredError = this.preferGoogleError(preferredError, parsedError);
                     continue;
                 }
 
@@ -359,17 +360,17 @@ export class GoogleProvider extends BaseProvider {
             }
         }
 
-        if (lastError) {
+        if (preferredError) {
             const isVeoModel = modelId.toLowerCase().startsWith('veo-');
-            if (isVeoModel && lastError.statusCode === 404) {
+            if (isVeoModel && preferredError.statusCode === 404) {
                 throw this.createGoogleApiError(
                     `Veo model ${modelId} is unavailable for this API key/project. ` +
                     'Veo models require Gemini API paid tier access (billing enabled) and supported region availability.',
-                    lastError.statusCode,
-                    lastError.status
+                    preferredError.statusCode,
+                    preferredError.status
                 );
             }
-            throw this.createGoogleApiError(lastError.message, lastError.statusCode, lastError.status);
+            throw this.createGoogleApiError(preferredError.message, preferredError.statusCode, preferredError.status);
         }
 
         throw new Error('Google video request failed');
@@ -381,7 +382,6 @@ export class GoogleProvider extends BaseProvider {
         prompt: string
     ): Array<{ endpoint: string; payload: unknown }> {
         const predictLongRunningEndpoint = `${baseUrl}/models/${encodeURIComponent(modelId)}:predictLongRunning`;
-        const generateVideosEndpoint = `${baseUrl}/models/${encodeURIComponent(modelId)}:generateVideos`;
         return [
             {
                 endpoint: predictLongRunningEndpoint,
@@ -417,15 +417,16 @@ export class GoogleProvider extends BaseProvider {
                     instances: [{ prompt }],
                 },
             },
-            {
-                endpoint: generateVideosEndpoint,
-                payload: { prompt: { text: prompt }, config: { numberOfVideos: 1 } },
-            },
-            {
-                endpoint: generateVideosEndpoint,
-                payload: { prompt, config: { numberOfVideos: 1 } },
-            },
         ];
+    }
+
+    private preferGoogleError(
+        current: { message: string; statusCode: number; status: string } | null,
+        next: { message: string; statusCode: number; status: string }
+    ): { message: string; statusCode: number; status: string } {
+        if (!current) return next;
+        if (current.statusCode === 404 && next.statusCode !== 404) return next;
+        return current;
     }
 
     private getVideoModelCandidates(modelId: string): string[] {
