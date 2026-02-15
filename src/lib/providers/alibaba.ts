@@ -97,7 +97,11 @@ export class AlibabaProvider extends BaseProvider {
                         message.includes('unauthorized') ||
                         message.includes('forbidden') ||
                         message.includes('401') ||
-                        message.includes('403'));
+                        message.includes('403') ||
+                        message.includes('model not exist') ||
+                        message.includes('model access denied') ||
+                        message.includes('access denied') ||
+                        message.includes('no permission'));
 
                 if (shouldTryNext) continue;
                 throw this.parseAlibabaError(error, request.model);
