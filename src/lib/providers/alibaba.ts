@@ -1,5 +1,5 @@
 import { BaseProvider } from './base';
-import { CompletionRequest, CompletionResponse, ProviderType } from '@/types';
+import { CompletionError, CompletionRequest, CompletionResponse, ProviderType } from '@/types';
 import { getModelById, calculateCost } from '@/lib/config';
 
 export class AlibabaProvider extends BaseProvider {
@@ -100,11 +100,11 @@ export class AlibabaProvider extends BaseProvider {
                         message.includes('403'));
 
                 if (shouldTryNext) continue;
-                throw this.parseError(error, request.model);
+                throw this.parseAlibabaError(error, request.model);
             }
         }
 
-        throw this.parseError(preferredError ?? lastError, request.model);
+        throw this.parseAlibabaError(preferredError ?? lastError, request.model);
     }
 
     async *streamComplete(
@@ -175,7 +175,7 @@ export class AlibabaProvider extends BaseProvider {
                 }
             }
         } catch (error) {
-            throw this.parseError(error, request.model);
+            throw this.parseAlibabaError(error, request.model);
         }
     }
 
@@ -278,6 +278,34 @@ export class AlibabaProvider extends BaseProvider {
         ) return 1;
 
         return 2;
+    }
+
+    private parseAlibabaError(error: unknown, model: string): CompletionError {
+        if (!(error instanceof Error)) {
+            return this.parseError(error, model);
+        }
+
+        const message = error.message.toLowerCase();
+
+        // For Alibaba, 403/forbidden is often model/workspace/region permission,
+        // not API key invalidation. Show a model-access message first.
+        if (
+            message.includes('model access denied') ||
+            message.includes('model not exist') ||
+            message.includes('model_not_found') ||
+            message.includes('modelnotfound') ||
+            message.includes('no permission') ||
+            message.includes('workspace') ||
+            (message.includes('403') && !message.includes('invalid api key'))
+        ) {
+            return this.createError(
+                model,
+                'invalid_request',
+                `Model is unavailable for this Alibaba account/region/workspace. ${error.message}`
+            );
+        }
+
+        return this.parseError(error, model);
     }
 
     private isStreamingOnlyModel(model: NonNullable<ReturnType<typeof getModelById>>): boolean {
