@@ -82,6 +82,8 @@ export default function PlaygroundPage() {
     // New state for SPEC v2.0
     const [mode, setMode] = useState<CalculationMode>('estimate');
     const [expectedOutput, setExpectedOutput] = useState<number | undefined>(undefined);
+    const [requestsPerMonth, setRequestsPerMonth] = useState(1000);
+    const [isPanelOpen, setIsPanelOpen] = useState(false);
 
     const allModels = getAllModels();
     const visibleModels = mode === 'sample' ? allModels.filter(isSampleSupportedModel) : allModels;
@@ -187,55 +189,77 @@ export default function PlaygroundPage() {
 
             <div className="flex p-10 gap-10 max-w-[1400px] mx-auto box-border h-[calc(100vh-60px)]">
 
-                {/* LEFT COLUMN */}
-                <div className="w-[30%] flex flex-col gap-5 h-full">
-                    <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
-                        <div className="bg-foreground text-background p-[15px] font-bold text-center uppercase text-sm">
-                            Model Reference
-                        </div>
-                        <div className="p-[15px] overflow-y-auto h-full">
-                            {CATEGORY_ORDER.map((category) => {
-                                const providersInCategory = modelsByCategory[category];
-                                if (!providersInCategory) return null;
+                {/* LEFT COLUMN - Collapsible */}
+                {isPanelOpen ? (
+                    <div className="w-[30%] flex flex-col gap-5 h-full transition-all duration-300">
+                        <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
+                            <div className="bg-foreground text-background p-[15px] font-bold text-center uppercase text-sm flex items-center justify-between">
+                                <span>Model Reference</span>
+                                <button
+                                    onClick={() => setIsPanelOpen(false)}
+                                    className="text-background/70 hover:text-background text-lg leading-none"
+                                    title="Collapse panel"
+                                >
+                                    ◀
+                                </button>
+                            </div>
+                            <div className="p-[15px] overflow-y-auto h-full">
+                                {CATEGORY_ORDER.map((category) => {
+                                    const providersInCategory = modelsByCategory[category];
+                                    if (!providersInCategory) return null;
 
-                                const providerEntries = Object.entries(providersInCategory)
-                                    .sort(([a], [b]) => PROVIDER_LABELS[a as ProviderType].localeCompare(PROVIDER_LABELS[b as ProviderType]));
+                                    const providerEntries = Object.entries(providersInCategory)
+                                        .sort(([a], [b]) => PROVIDER_LABELS[a as ProviderType].localeCompare(PROVIDER_LABELS[b as ProviderType]));
 
-                                if (providerEntries.length === 0) return null;
+                                    if (providerEntries.length === 0) return null;
 
-                                return (
-                                    <div key={category} className="mb-6">
-                                        <div className="font-extrabold border-b border-foreground/20 pb-1 mb-3 text-[0.82rem] uppercase tracking-wide opacity-80">
-                                            {CATEGORY_LABELS[category]}
-                                        </div>
-                                        {providerEntries.map(([provider, models]) => (
-                                            <div key={`${category}-${provider}`} className="mb-4">
-                                                <div className="font-bold border-b border-foreground/10 pb-1 mb-2 text-[0.78rem] uppercase opacity-50">
-                                                    {PROVIDER_LABELS[provider as ProviderType]}
-                                                </div>
-                                                {[...models].sort((a, b) => a.name.localeCompare(b.name)).map(model => (
-                                                    <div
-                                                        key={model.id}
-                                                        onClick={() => handleModelToggle(model)}
-                                                        className={`
-                                                            text-[0.85rem] py-1.5 cursor-pointer hover:text-foreground transition-colors
-                                                            ${selectedModels.find(m => m.id === model.id) ? 'font-bold text-foreground' : 'text-foreground/60'}
-                                                        `}
-                                                    >
-                                                        {model.name} {selectedModels.find(m => m.id === model.id) && '(Selected)'}
-                                                    </div>
-                                                ))}
+                                    return (
+                                        <div key={category} className="mb-6">
+                                            <div className="font-extrabold border-b border-foreground/20 pb-1 mb-3 text-[0.82rem] uppercase tracking-wide opacity-80">
+                                                {CATEGORY_LABELS[category]}
                                             </div>
-                                        ))}
-                                    </div>
-                                );
-                            })}
+                                            {providerEntries.map(([provider, models]) => (
+                                                <div key={`${category}-${provider}`} className="mb-4">
+                                                    <div className="font-bold border-b border-foreground/10 pb-1 mb-2 text-[0.78rem] uppercase opacity-50">
+                                                        {PROVIDER_LABELS[provider as ProviderType]}
+                                                    </div>
+                                                    {[...models].sort((a, b) => a.name.localeCompare(b.name)).map(model => (
+                                                        <div
+                                                            key={model.id}
+                                                            onClick={() => handleModelToggle(model)}
+                                                            className={`
+                                                                text-[0.85rem] py-1.5 cursor-pointer hover:text-foreground transition-colors
+                                                                ${selectedModels.find(m => m.id === model.id) ? 'font-bold text-foreground' : 'text-foreground/60'}
+                                                            `}
+                                                        >
+                                                            {model.name} {selectedModels.find(m => m.id === model.id) && '(Selected)'}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div
+                        className="w-[48px] flex flex-col items-center bg-foreground text-background rounded-lg cursor-pointer hover:opacity-90 transition-opacity shadow-sm h-full"
+                        onClick={() => setIsPanelOpen(true)}
+                        title="Expand model panel"
+                    >
+                        <div className="writing-mode-vertical text-xs font-bold uppercase tracking-widest py-4 flex-grow flex items-center"
+                            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+                        >
+                            Models
+                        </div>
+                        <div className="pb-3 text-lg">▶</div>
+                    </div>
+                )}
 
                 {/* RIGHT COLUMN */}
-                <div className="w-[70%] flex flex-col">
+                <div className={`${isPanelOpen ? 'w-[70%]' : 'flex-1'} flex flex-col`}>
 
                     {/* Selected Tags */}
                     <div className="text-[0.8rem] text-foreground mb-[10px] font-bold flex gap-[10px] min-h-[24px]">
@@ -258,9 +282,24 @@ export default function PlaygroundPage() {
                         isLoading={isLoading}
                     />
 
-                    {/* Mode Toggle */}
-                    <div className="mb-4">
+                    {/* Mode Toggle + Requests/Month */}
+                    <div className="mb-4 flex items-center gap-4">
                         <ModeToggle value={mode} onChange={setMode} />
+                        {mode === 'estimate' && (
+                            <div className="flex items-center gap-2 text-sm">
+                                <label htmlFor="requests-per-month" className="text-foreground/60 whitespace-nowrap">
+                                    Requests/month:
+                                </label>
+                                <input
+                                    id="requests-per-month"
+                                    type="number"
+                                    min={1}
+                                    value={requestsPerMonth}
+                                    onChange={(e) => setRequestsPerMonth(Math.max(1, parseInt(e.target.value) || 1))}
+                                    className="w-[100px] bg-background border border-foreground/20 rounded px-2 py-1 text-foreground text-sm"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Conditional Controls based on mode */}
@@ -298,8 +337,11 @@ export default function PlaygroundPage() {
 
                     {/* Controls */}
                     <div className="flex justify-between items-center mb-[30px]">
-                        <button className="bg-transparent border border-foreground/40 text-foreground px-[24px] py-[10px] rounded-full font-semibold hover:bg-foreground/5 transition-colors">
-                            ▼ Select Models
+                        <button
+                            onClick={() => setIsPanelOpen(prev => !prev)}
+                            className="bg-transparent border border-foreground/40 text-foreground px-[24px] py-[10px] rounded-full font-semibold hover:bg-foreground/5 transition-colors"
+                        >
+                            {isPanelOpen ? '◀ Hide Models' : '▶ Select Models'}
                         </button>
                         <button
                             onClick={handleCompare}
@@ -319,6 +361,7 @@ export default function PlaygroundPage() {
                                     key={estimate.modelId}
                                     estimate={estimate}
                                     isCheapest={estimate.modelId === estimateResult.cheapest}
+                                    requestsPerMonth={requestsPerMonth}
                                 />
                             ))
                         ) : mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0 ? (

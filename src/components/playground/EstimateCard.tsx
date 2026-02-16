@@ -6,9 +6,11 @@ import { formatCost, formatTokens } from '@/lib/tokens';
 interface EstimateCardProps {
     estimate: PriceEstimateV2;
     isCheapest?: boolean;
+    requestsPerMonth?: number;
 }
 
-export default function EstimateCard({ estimate, isCheapest }: EstimateCardProps) {
+export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 1000 }: EstimateCardProps) {
+    const isFree = estimate.total.median === 0 && estimate.total.max === 0;
     const getConfidenceColor = (confidence: string) => {
         switch (confidence) {
             case 'high': return 'text-green-600';
@@ -58,10 +60,29 @@ export default function EstimateCard({ estimate, isCheapest }: EstimateCardProps
                     <div className="text-[1.8rem] font-bold text-foreground mb-1">
                         {formatCost(estimate.total.median)}
                     </div>
-                    <div className="text-[0.65rem] text-foreground/40">
-                        Range: {formatCost(estimate.total.min)} - {formatCost(estimate.total.max)}
-                    </div>
+                    {isFree ? (
+                        <div className="text-[0.7rem] text-green-600 font-medium">
+                            This model is free to use
+                        </div>
+                    ) : (
+                        <div className="text-[0.65rem] text-foreground/40">
+                            Range: {formatCost(estimate.total.min)} - {formatCost(estimate.total.max)}
+                        </div>
+                    )}
                 </div>
+
+                {/* Monthly Cost Projection */}
+                {!isFree && (
+                    <div className="text-center mb-4 pb-4 border-b border-foreground/10">
+                        <div className="text-[0.7rem] text-foreground/50 uppercase font-bold mb-1">Monthly Cost</div>
+                        <div className="text-[1.2rem] font-bold text-foreground">
+                            {formatCost(estimate.total.median * requestsPerMonth)}
+                        </div>
+                        <div className="text-[0.65rem] text-foreground/40">
+                            at {requestsPerMonth.toLocaleString()} requests/month
+                        </div>
+                    </div>
+                )}
 
                 {/* Token Breakdown */}
                 <div className="space-y-2 mb-4">

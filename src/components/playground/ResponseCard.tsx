@@ -23,6 +23,8 @@ export default function ResponseCard({ result }: ResponseCardProps) {
         ? result.actualCost
         : result.total.median;
 
+    const isFree = displayCost === 0;
+
     const displayTokens = isSample
         ? result.actualUsage.inputTokens + result.actualUsage.outputTokens
         : (typeof result.breakdown.output.tokens === 'number'
@@ -82,7 +84,7 @@ export default function ResponseCard({ result }: ResponseCardProps) {
                         )}
 
                         <div className="text-xs text-foreground/50 border-t border-foreground/10 pt-2">
-                            <div>Total Cost: {formatCost(result.actualCost)}</div>
+                            <div>Total Cost: {formatCost(result.actualCost)}{isFree && <span className="ml-1 text-green-600">This model is free to use</span>}</div>
                             <div>Latency: {result.latencyMs}ms</div>
                             {sampleMedia?.type === 'video' && sampleMedia.durationSeconds && (
                                 <div>Duration: {sampleMedia.durationSeconds.toFixed(1)}s</div>
