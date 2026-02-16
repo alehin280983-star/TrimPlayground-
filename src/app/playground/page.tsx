@@ -29,6 +29,7 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
     xai: 'xAI',
     alibaba: 'Alibaba Cloud',
     moonshot: 'Moonshot',
+    zhipu: 'Zhipu AI',
 };
 
 const SAMPLE_SUPPORTED_MODALITIES: Record<ProviderType, Array<'text' | 'image' | 'video' | 'audio' | 'embedding'>> = {
@@ -41,6 +42,7 @@ const SAMPLE_SUPPORTED_MODALITIES: Record<ProviderType, Array<'text' | 'image' |
     xai: ['text', 'image', 'video'],
     alibaba: ['text'],
     moonshot: ['text'],
+    zhipu: ['text'],
 };
 
 function getModelCategory(model: ModelConfig): ModelCategory {

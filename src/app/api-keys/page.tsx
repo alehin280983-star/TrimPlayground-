@@ -17,7 +17,8 @@ export default function APIKeysPage() {
         'deepseek',
         'xai',
         'alibaba',
-        'moonshot'
+        'moonshot',
+        'zhipu'
     ];
 
     return (

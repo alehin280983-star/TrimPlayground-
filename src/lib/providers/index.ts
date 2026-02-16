@@ -8,6 +8,7 @@ export { DeepSeekProvider } from './deepseek';
 export { XAIProvider } from './xai';
 export { AlibabaProvider } from './alibaba';
 export { MoonshotProvider } from './moonshot';
+export { ZhipuProvider } from './zhipu';
 
 import { ProviderType } from '@/types';
 import { OpenAIProvider } from './openai';
@@ -19,6 +20,7 @@ import { DeepSeekProvider } from './deepseek';
 import { XAIProvider } from './xai';
 import { AlibabaProvider } from './alibaba';
 import { MoonshotProvider } from './moonshot';
+import { ZhipuProvider } from './zhipu';
 import { BaseProvider } from './base';
 
 /**
@@ -44,6 +46,8 @@ export function createProvider(providerType: ProviderType): BaseProvider {
             return new AlibabaProvider();
         case 'moonshot':
             return new MoonshotProvider();
+        case 'zhipu':
+            return new ZhipuProvider();
         default:
             throw new Error(`Unknown provider: ${providerType}`);
     }
@@ -81,6 +85,9 @@ export function getConfiguredProviders(): Map<ProviderType, BaseProvider> {
 
     const moonshot = new MoonshotProvider();
     if (moonshot.isConfigured()) providers.set('moonshot', moonshot);
+
+    const zhipu = new ZhipuProvider();
+    if (zhipu.isConfigured()) providers.set('zhipu', zhipu);
 
     return providers;
 }

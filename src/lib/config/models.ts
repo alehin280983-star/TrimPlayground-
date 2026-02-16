@@ -3,6 +3,54 @@ import { ModelConfig, ProviderConfig } from '@/types';
 // OpenAI Models (Strictly from User List)
 const openaiModels: ModelConfig[] = [
     {
+        id: 'gpt-5.3-codex',
+        name: 'GPT-5.3 Codex',
+        provider: 'openai',
+        inputPrice: 0.00175, // $1.75 / 1M (estimated, same as GPT-5.2)
+        outputPrice: 0.014, // $14.00 / 1M
+        cachedInputPrice: 0.000175,
+        maxTokens: 400000,
+        maxOutputTokens: 128000,
+        freeTierAvailable: false,
+        description: 'Most capable agentic coding model combining Codex + GPT-5 training stacks',
+        speedRating: 3,
+        qualityRating: 5,
+        modality: 'text',
+        apiEndpoint: 'responses',
+    },
+    {
+        id: 'gpt-5.1-codex-max',
+        name: 'GPT-5.1 Codex Max',
+        provider: 'openai',
+        inputPrice: 0.00125, // $1.25 / 1M
+        outputPrice: 0.01, // $10.00 / 1M
+        cachedInputPrice: 0.000125,
+        maxTokens: 400000,
+        maxOutputTokens: 128000,
+        freeTierAvailable: false,
+        description: 'Frontier agentic coding model for long-running project-scale work',
+        speedRating: 3,
+        qualityRating: 5,
+        modality: 'text',
+        apiEndpoint: 'responses',
+    },
+    {
+        id: 'gpt-5.1-codex-mini',
+        name: 'GPT-5.1 Codex Mini',
+        provider: 'openai',
+        inputPrice: 0.00025, // $0.25 / 1M
+        outputPrice: 0.002, // $2.00 / 1M
+        cachedInputPrice: 0.000025,
+        maxTokens: 400000,
+        maxOutputTokens: 128000,
+        freeTierAvailable: false,
+        description: 'Smaller, faster Codex model for routine coding tasks',
+        speedRating: 5,
+        qualityRating: 3,
+        modality: 'text',
+        apiEndpoint: 'responses',
+    },
+    {
         id: 'gpt-5.1',
         name: 'GPT-5.1',
         provider: 'openai',
@@ -498,7 +546,21 @@ const openaiModels: ModelConfig[] = [
 
 // Anthropic Models (Official API - Updated 2026-02-06)
 const anthropicModels: ModelConfig[] = [
-    // Latest Models (Claude 4.x - if available)
+    // Latest Models (Claude 4.x)
+    {
+        id: 'claude-opus-4-6',
+        name: 'Claude Opus 4.6',
+        provider: 'anthropic',
+        inputPrice: 0.005, // $5.00 / 1M
+        outputPrice: 0.025, // $25.00 / 1M
+        cachedInputPrice: 0.0005, // $0.50 / 1M (cache read 0.1x)
+        maxTokens: 1000000,
+        maxOutputTokens: 128000,
+        freeTierAvailable: false,
+        description: 'Most capable Claude model with 1M context window and 128K output',
+        speedRating: 2,
+        qualityRating: 5,
+    },
     {
         id: 'claude-opus-4-5',
         name: 'Claude Opus 4.5',
@@ -1983,6 +2045,62 @@ const moonshotModels: ModelConfig[] = [
 ];
 
 // Provider configurations
+// Zhipu GLM Models
+const zhipuModels: ModelConfig[] = [
+    {
+        id: 'glm-5',
+        name: 'GLM-5',
+        provider: 'zhipu',
+        inputPrice: 0.001, // $1.00 / 1M
+        outputPrice: 0.0032, // $3.20 / 1M
+        maxTokens: 200000,
+        maxOutputTokens: 8192,
+        freeTierAvailable: false,
+        description: '744B MoE flagship model trained on Huawei Ascend chips',
+        speedRating: 3,
+        qualityRating: 5,
+    },
+    {
+        id: 'glm-4.7',
+        name: 'GLM-4.7',
+        provider: 'zhipu',
+        inputPrice: 0.0006, // $0.60 / 1M
+        outputPrice: 0.0022, // $2.20 / 1M
+        maxTokens: 128000,
+        maxOutputTokens: 8192,
+        freeTierAvailable: false,
+        description: 'High-performance general-purpose model',
+        speedRating: 4,
+        qualityRating: 4,
+    },
+    {
+        id: 'glm-4.7-flash',
+        name: 'GLM-4.7 Flash',
+        provider: 'zhipu',
+        inputPrice: 0, // Free
+        outputPrice: 0, // Free
+        maxTokens: 128000,
+        maxOutputTokens: 8192,
+        freeTierAvailable: true,
+        description: 'Free fast model for general tasks',
+        speedRating: 5,
+        qualityRating: 3,
+    },
+    {
+        id: 'glm-4.5-flash',
+        name: 'GLM-4.5 Flash',
+        provider: 'zhipu',
+        inputPrice: 0, // Free
+        outputPrice: 0, // Free
+        maxTokens: 128000,
+        maxOutputTokens: 8192,
+        freeTierAvailable: true,
+        description: 'Free lightweight model for simple tasks',
+        speedRating: 5,
+        qualityRating: 3,
+    },
+];
+
 export const providers: ProviderConfig[] = [
     {
         id: 'openai',
@@ -2053,6 +2171,14 @@ export const providers: ProviderConfig[] = [
         name: 'Moonshot',
         logo: '/icons/moonshot.svg',
         models: moonshotModels,
+        streamSupported: false,
+        tokenCountingSupported: false,
+    },
+    {
+        id: 'zhipu',
+        name: 'Zhipu AI',
+        logo: '/icons/zhipu.svg',
+        models: zhipuModels,
         streamSupported: false,
         tokenCountingSupported: false,
     },

@@ -82,6 +82,7 @@ export default function APIKeyInput({ provider, onKeyChange }: APIKeyInputProps)
         xai: 'xAI',
         alibaba: 'Alibaba',
         moonshot: 'Moonshot',
+        zhipu: 'Zhipu AI',
     };
 
     const inputId = `api-key-${provider}`;

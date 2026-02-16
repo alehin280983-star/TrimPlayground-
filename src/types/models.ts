@@ -25,7 +25,7 @@ export interface ModelConfig {
   }[];
 }
 
-export type ProviderType = 'openai' | 'anthropic' | 'google' | 'mistral' | 'cohere' | 'deepseek' | 'xai' | 'alibaba' | 'moonshot';
+export type ProviderType = 'openai' | 'anthropic' | 'google' | 'mistral' | 'cohere' | 'deepseek' | 'xai' | 'alibaba' | 'moonshot' | 'zhipu';
 
 export interface ProviderConfig {
   id: ProviderType;

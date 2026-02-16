@@ -8,6 +8,7 @@ import { DeepSeekProvider } from '@/lib/providers/deepseek';
 import { XAIProvider } from '@/lib/providers/xai';
 import { AlibabaProvider } from '@/lib/providers/alibaba';
 import { MoonshotProvider } from '@/lib/providers/moonshot';
+import { ZhipuProvider } from '@/lib/providers/zhipu';
 import { getModelById } from '@/lib/config/models';
 import { ProviderType, SampleResultV2 } from '@/types';
 import { BaseProvider } from '@/lib/providers/base';
@@ -46,6 +47,8 @@ function isSupportedInSampleMode(modelId: string): boolean {
     if (id.includes('realtime')) return false;
     // OCR models require file/image input via OCR-specific API flow.
     if (id.includes('ocr')) return false;
+    // Deep Research models require multi-turn dialog and region-specific endpoints.
+    if (id.includes('deep-research')) return false;
     return true;
 }
 
@@ -69,6 +72,8 @@ function createProviderWithKey(providerType: ProviderType, apiKey: string): Base
             return new AlibabaProvider(apiKey);
         case 'moonshot':
             return new MoonshotProvider(apiKey);
+        case 'zhipu':
+            return new ZhipuProvider(apiKey);
         default:
             throw new Error(`Provider ${providerType} not supported for sample mode`);
     }
