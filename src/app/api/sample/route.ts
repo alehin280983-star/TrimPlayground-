@@ -137,7 +137,24 @@ export async function POST(request: NextRequest) {
 
             const apiKey = apiKeys[model.provider];
             if (!apiKey) {
-                // Skip models without API key
+                results.push({
+                    modelId,
+                    modelName: model.name,
+                    provider: model.provider,
+                    mode: 'sample',
+                    breakdown: {
+                        input: { tokens: 0, cost: 0 },
+                        output: { tokens: 0, cost: 0 },
+                    },
+                    total: { min: 0, median: 0, max: 0 },
+                    confidence: 'low',
+                    warnings: [`Missing API key for ${model.provider}. Add it on the API Keys page.`],
+                    calculatedAt: new Date().toISOString(),
+                    actualUsage: { inputTokens: 0, outputTokens: 0 },
+                    actualCost: 0,
+                    responsePreview: `❌ Error: No API key provided for ${model.provider}`,
+                    latencyMs: 0,
+                });
                 continue;
             }
 

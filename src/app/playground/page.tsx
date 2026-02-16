@@ -146,7 +146,7 @@ export default function PlaygroundPage() {
             } else {
                 // Sample mode - reload API keys from session storage before making the call
                 const STORAGE_PREFIX = 'trim_api_key_';
-                const providers: ProviderType[] = ['openai', 'anthropic', 'google', 'mistral', 'cohere', 'deepseek', 'xai', 'alibaba', 'moonshot'];
+                const providers: ProviderType[] = ['openai', 'anthropic', 'google', 'mistral', 'cohere', 'deepseek', 'xai', 'alibaba', 'moonshot', 'zhipu'];
                 const freshApiKeys: Partial<Record<ProviderType, string>> = {};
 
                 providers.forEach(p => {
@@ -308,7 +308,7 @@ export default function PlaygroundPage() {
                                     isCheapest={estimate.modelId === estimateResult.cheapest}
                                 />
                             ))
-                        ) : mode === 'sample' && sampleResult && sampleResult.results ? (
+                        ) : mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0 ? (
                             /* Sample mode: show response cards */
                             sampleResult.results.map((result, idx) => (
                                 <ResponseCard key={idx} result={result} />
