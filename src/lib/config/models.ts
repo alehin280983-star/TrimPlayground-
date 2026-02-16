@@ -3,8 +3,8 @@ import { ModelConfig, ProviderConfig } from '@/types';
 // OpenAI Models (Strictly from User List)
 const openaiModels: ModelConfig[] = [
     {
-        id: 'gpt-5.3-codex',
-        name: 'GPT-5.3 Codex',
+        id: 'gpt-5-codex',
+        name: 'GPT-5 Codex',
         provider: 'openai',
         inputPrice: 0.00175, // $1.75 / 1M (estimated, same as GPT-5.2)
         outputPrice: 0.014, // $14.00 / 1M
