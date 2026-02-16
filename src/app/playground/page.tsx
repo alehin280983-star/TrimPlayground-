@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@clerk/nextjs';
 import { Header } from '@/components/layout';
 import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, OutputControl } from '@/components/playground';
 import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, ProviderType } from '@/types';
@@ -64,6 +65,7 @@ function isSampleSupportedModel(model: ModelConfig): boolean {
 }
 
 export default function PlaygroundPage() {
+    const { isSignedIn } = useAuth();
     const [selectedModels, setSelectedModels] = useState<ModelConfig[]>([]);
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -272,7 +274,18 @@ export default function PlaygroundPage() {
                         </div>
                     )}
 
-                    {mode === 'sample' && (
+                    {mode === 'sample' && !isSignedIn && (
+                        <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                            <div className="text-sm font-semibold text-red-400 mb-1">
+                                Sign in required for Sample mode
+                            </div>
+                            <div className="text-xs text-foreground/50">
+                                Sample mode makes real API calls and requires authentication. Please sign in to use it.
+                            </div>
+                        </div>
+                    )}
+
+                    {mode === 'sample' && isSignedIn && (
                         <div className="mb-4 p-4 bg-foreground/5 border border-foreground/10 rounded-lg">
                             <div className="text-sm font-semibold text-foreground/80 mb-1">
                                 Sample Mode Active
@@ -290,8 +303,8 @@ export default function PlaygroundPage() {
                         </button>
                         <button
                             onClick={handleCompare}
-                            disabled={isLoading || selectedModels.length === 0}
-                            className="bg-red-500 text-white border-none px-[48px] py-[12px] rounded-full font-bold uppercase shadow-lg hover:scale-[1.02] active:scale-95 transition-all disabled:cursor-not-allowed"
+                            disabled={isLoading || selectedModels.length === 0 || (mode === 'sample' && !isSignedIn)}
+                            className="bg-red-500 text-white border-none px-[48px] py-[12px] rounded-full font-bold uppercase shadow-lg hover:scale-[1.02] active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {isLoading ? 'Processing...' : mode === 'estimate' ? 'ESTIMATE' : 'SAMPLE'}
                         </button>

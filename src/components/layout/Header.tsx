@@ -19,11 +19,9 @@ export default function Header() {
                     <Link href="/playground" className="text-sm font-bold uppercase tracking-wider hover:text-accent transition-colors">
                         Playground
                     </Link>
-                    {isLoaded && isSignedIn && (
-                        <Link href="/api-keys" className="text-sm font-bold uppercase tracking-wider hover:text-accent transition-colors">
-                            API Keys
-                        </Link>
-                    )}
+                    <Link href="/api-keys" className="text-sm font-bold uppercase tracking-wider hover:text-accent transition-colors">
+                        API Keys
+                    </Link>
                 </nav>
             </div>
 
