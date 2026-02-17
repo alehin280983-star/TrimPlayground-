@@ -358,14 +358,23 @@ export default function PlaygroundPage() {
                     <div className="flex justify-between gap-[20px] mt-[10px]">
                         {/* Estimate mode: show estimate cards */}
                         {mode === 'estimate' && estimateResult && Array.isArray(estimateResult.estimates) ? (
-                            estimateResult.estimates.map((estimate) => (
-                                <EstimateCard
-                                    key={estimate.modelId}
-                                    estimate={estimate}
-                                    isCheapest={estimate.modelId === estimateResult.cheapest}
-                                    requestsPerMonth={requestsPerMonth}
-                                />
-                            ))
+                            (() => {
+                                const cheapestId = estimateResult.estimates.reduce<string | null>((cheapId, est) => {
+                                    if (!cheapId) return est.modelId;
+                                    const cheapEst = estimateResult.estimates.find(e => e.modelId === cheapId);
+                                    if (!cheapEst) return est.modelId;
+                                    return est.total.median * requestsPerMonth < cheapEst.total.median * requestsPerMonth
+                                        ? est.modelId : cheapId;
+                                }, null);
+                                return estimateResult.estimates.map((estimate) => (
+                                    <EstimateCard
+                                        key={estimate.modelId}
+                                        estimate={estimate}
+                                        isCheapest={estimate.modelId === cheapestId}
+                                        requestsPerMonth={requestsPerMonth}
+                                    />
+                                ));
+                            })()
                         ) : mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0 ? (
                             /* Sample mode: show response cards */
                             sampleResult.results.map((result, idx) => (
