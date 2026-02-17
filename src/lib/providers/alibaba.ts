@@ -309,6 +309,21 @@ export class AlibabaProvider extends BaseProvider {
             );
         }
 
+        // If all endpoints returned auth-like errors, it's likely a model access issue, not a bad key
+        if (
+            message.includes('invalid api key') ||
+            message.includes('unauthorized') ||
+            message.includes('forbidden') ||
+            message.includes('401') ||
+            message.includes('403')
+        ) {
+            return this.createError(
+                model,
+                'invalid_request',
+                `Model "${model}" is not available for your Alibaba Cloud account or region. Enable it in the DashScope console.`
+            );
+        }
+
         return this.parseError(error, model);
     }
 
