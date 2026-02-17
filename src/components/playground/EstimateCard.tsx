@@ -1,16 +1,28 @@
 'use client';
 
 import { PriceEstimateV2 } from '@/types';
+import { EnrichedEstimate } from '@/lib/estimate-calculator';
 import { formatCost, formatTokens } from '@/lib/tokens';
+import FormulaDisplay from './FormulaDisplay';
 
 interface EstimateCardProps {
-    estimate: PriceEstimateV2;
+    estimate: EnrichedEstimate | PriceEstimateV2;
     isCheapest?: boolean;
     requestsPerMonth?: number;
 }
 
+function isEnriched(est: EnrichedEstimate | PriceEstimateV2): est is EnrichedEstimate {
+    return 'monthlyCost' in est;
+}
+
 export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 1000 }: EstimateCardProps) {
+    const enriched = isEnriched(estimate) ? estimate : null;
     const isFree = estimate.total.median === 0 && estimate.total.max === 0;
+
+    const monthlyCostMedian = enriched
+        ? enriched.monthlyCost.median
+        : estimate.total.median * requestsPerMonth;
+
     const getConfidenceColor = (confidence: string) => {
         switch (confidence) {
             case 'high': return 'text-green-600';
@@ -54,10 +66,10 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
 
             {/* Body */}
             <div className="p-[20px] flex-grow">
-                {/* Total Cost Range */}
+                {/* Per-request Cost */}
                 <div className="text-center mb-4 pb-4 border-b border-foreground/10">
-                    <div className="text-[0.7rem] text-foreground/50 uppercase font-bold mb-1">Estimated Total</div>
-                    <div className="text-[1.8rem] font-bold text-foreground mb-1">
+                    <div className="text-[0.7rem] text-foreground/50 uppercase font-bold mb-1">Per Request</div>
+                    <div className="text-[1.4rem] font-bold text-foreground mb-1">
                         {formatCost(estimate.total.median)}
                     </div>
                     {isFree ? (
@@ -71,16 +83,22 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
                     )}
                 </div>
 
-                {/* Monthly Cost Projection */}
+                {/* Monthly Cost */}
                 {!isFree && (
                     <div className="text-center mb-4 pb-4 border-b border-foreground/10">
                         <div className="text-[0.7rem] text-foreground/50 uppercase font-bold mb-1">Monthly Cost</div>
-                        <div className="text-[1.2rem] font-bold text-foreground">
-                            {formatCost(estimate.total.median * requestsPerMonth)}
+                        <div className="text-[1.8rem] font-bold text-foreground">
+                            {formatCost(monthlyCostMedian)}
                         </div>
                         <div className="text-[0.65rem] text-foreground/40">
                             at {requestsPerMonth.toLocaleString()} requests/month
                         </div>
+                        {/* Batch line */}
+                        {enriched && enriched.supportsBatch && enriched.monthlyCost !== enriched.monthlyCost && (
+                            <div className="text-[0.7rem] text-green-600 font-medium mt-1">
+                                With Batch API: {formatCost(enriched.monthlyCost.median)}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -110,6 +128,13 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
                                 : formatCost(estimate.breakdown.output.cost.median)}
                         </span>
                     </div>
+                    {/* Caching/Batch notes */}
+                    {enriched && !enriched.supportsCaching && (
+                        <div className="text-[0.65rem] text-foreground/30 italic">Caching not available</div>
+                    )}
+                    {enriched && !enriched.supportsBatch && (
+                        <div className="text-[0.65rem] text-foreground/30 italic">Batch API not available</div>
+                    )}
                 </div>
 
                 {/* Confidence */}
@@ -122,7 +147,7 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
 
                 {/* Warnings */}
                 {estimate.warnings && estimate.warnings.length > 0 && (
-                    <div className="space-y-1">
+                    <div className="space-y-1 mb-3">
                         {estimate.warnings.map((warning, idx) => (
                             <div key={idx} className="text-[0.65rem] text-amber-700 bg-amber-50 dark:bg-amber-900/10 px-2 py-1 rounded">
                                 ℹ {warning}
@@ -130,6 +155,9 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
                         ))}
                     </div>
                 )}
+
+                {/* Formula */}
+                {enriched && <FormulaDisplay estimate={enriched} />}
             </div>
         </div>
     );

@@ -8,3 +8,7 @@ export { default as RangeDisplay } from './RangeDisplay';
 export { default as OutputControl } from './OutputControl';
 export { default as APIKeyInput } from './APIKeyInput';
 export { default as WarningBanner } from './WarningBanner';
+export { default as RatioSelector } from './RatioSelector';
+export { default as PrioritySelector } from './PrioritySelector';
+export { default as AdvancedSettings } from './AdvancedSettings';
+export { default as FormulaDisplay } from './FormulaDisplay';

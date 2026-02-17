@@ -8,6 +8,8 @@ import type { ProviderType } from './models';
 
 export type CalculationMode = "estimate" | "sample";
 export type ConfidenceLevel = "low" | "medium" | "high";
+export type OutputInputRatio = '1:1' | '1:2' | '1:4' | 'custom';
+export type PriorityMode = 'cost' | 'balanced' | 'quality';
 
 export interface PriceRange {
     min: number;

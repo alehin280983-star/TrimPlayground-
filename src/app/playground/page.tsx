@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { Header } from '@/components/layout';
-import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, OutputControl } from '@/components/playground';
-import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, ProviderType } from '@/types';
+import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, RatioSelector, PrioritySelector, AdvancedSettings } from '@/components/playground';
+import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, ProviderType, OutputInputRatio, PriorityMode } from '@/types';
 import { getAllModels } from '@/lib/config';
+import { recomputeEstimate, sortEstimates, findCheapest, EnrichedEstimate } from '@/lib/estimate-calculator';
 
 type ModelCategory = 'text_code' | 'image' | 'audio' | 'video' | 'embedding';
 
@@ -83,9 +84,18 @@ export default function PlaygroundPage() {
 
     // New state for SPEC v2.0
     const [mode, setMode] = useState<CalculationMode>('estimate');
-    const [expectedOutput, setExpectedOutput] = useState<number | undefined>(undefined);
     const [requestsPerMonth, setRequestsPerMonth] = useState(1000);
     const [expandedProvider, setExpandedProvider] = useState<ProviderType | null>(null);
+
+    // Progressive form state (estimate mode)
+    const [outputRatio, setOutputRatio] = useState<OutputInputRatio>('1:2');
+    const [customRatio, setCustomRatio] = useState(2);
+    const [priority, setPriority] = useState<PriorityMode>('cost');
+    const [cachingEnabled, setCachingEnabled] = useState(false);
+    const [cacheHitRate, setCacheHitRate] = useState(80);
+    const [batchEnabled, setBatchEnabled] = useState(false);
+    const [refineOpen, setRefineOpen] = useState(false);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
 
     const allModels = getAllModels();
     const visibleModels = mode === 'sample' ? allModels.filter(isSampleSupportedModel) : allModels;
@@ -106,6 +116,39 @@ export default function PlaygroundPage() {
 
     const providerEntries = (Object.keys(modelsByProvider) as ProviderType[])
         .sort((a, b) => PROVIDER_LABELS[a].localeCompare(PROVIDER_LABELS[b]));
+
+    // Persist collapse states
+    useEffect(() => {
+        const saved2 = localStorage.getItem('trim_refine_open');
+        const saved3 = localStorage.getItem('trim_advanced_open');
+        if (saved2 === 'true') setRefineOpen(true);
+        if (saved3 === 'true') setAdvancedOpen(true);
+    }, []);
+    useEffect(() => { localStorage.setItem('trim_refine_open', String(refineOpen)); }, [refineOpen]);
+    useEffect(() => { localStorage.setItem('trim_advanced_open', String(advancedOpen)); }, [advancedOpen]);
+
+    // Enriched estimates with client-side recomputation
+    const enrichedEstimates = useMemo(() => {
+        if (!estimateResult || !estimateResult.estimates.length) return null;
+        const models = getAllModels();
+        const recomputed = estimateResult.estimates.map(est => {
+            const model = models.find(m => m.id === est.modelId);
+            if (!model) return null;
+            return recomputeEstimate(est, model, {
+                outputInputRatio: outputRatio,
+                customRatio,
+                cachingEnabled,
+                cacheHitRate,
+                batchEnabled,
+                requestsPerMonth,
+            });
+        }).filter(Boolean) as EnrichedEstimate[];
+        const sorted = sortEstimates(recomputed, priority);
+        return { estimates: sorted, cheapest: findCheapest(sorted) };
+    }, [estimateResult, outputRatio, customRatio, priority, cachingEnabled, cacheHitRate, batchEnabled, requestsPerMonth]);
+
+    const anyCachingSupported = selectedModels.some(m => !!m.cachedInputPrice);
+    const anyBatchSupported = selectedModels.some(m => !!m.batchDiscount);
 
     const handleModelToggle = (model: ModelConfig) => {
         setSelectedModels(prev => {
@@ -131,7 +174,6 @@ export default function PlaygroundPage() {
                     body: JSON.stringify({
                         prompt,
                         modelIds: selectedModels.map(m => m.id),
-                        estimatedOutputTokens: expectedOutput,
                     }),
                 });
                 const data = await response.json();
@@ -302,14 +344,48 @@ export default function PlaygroundPage() {
                         </div>
                     </div>
 
-                    {/* Conditional Controls based on mode */}
+                    {/* Progressive Form (estimate mode) */}
                     {mode === 'estimate' && (
-                        <div className="mb-4">
-                            <OutputControl
-                                value={expectedOutput}
-                                onChange={setExpectedOutput}
-                                maxTokens={selectedModels[0]?.maxOutputTokens || 4096}
-                            />
+                        <div className="mb-4 space-y-2">
+                            {/* Level 2: Refine calculation */}
+                            <button
+                                onClick={() => setRefineOpen(prev => !prev)}
+                                className="text-[0.8rem] text-foreground/50 hover:text-foreground/80 transition-colors"
+                            >
+                                {refineOpen ? '▼' : '▶'} Refine calculation
+                            </button>
+                            {refineOpen && (
+                                <div className="pl-4 space-y-3 pb-2 border-l-2 border-foreground/10">
+                                    <RatioSelector
+                                        ratio={outputRatio}
+                                        customValue={customRatio}
+                                        onChange={(r, cv) => { setOutputRatio(r); if (cv !== undefined) setCustomRatio(cv); }}
+                                    />
+                                    <PrioritySelector value={priority} onChange={setPriority} />
+
+                                    {/* Level 3: Advanced settings */}
+                                    <button
+                                        onClick={() => setAdvancedOpen(prev => !prev)}
+                                        className="text-[0.75rem] text-foreground/40 hover:text-foreground/70 transition-colors"
+                                    >
+                                        {advancedOpen ? '▼' : '▶'} Advanced settings
+                                    </button>
+                                    {advancedOpen && (
+                                        <div className="pl-4 border-l-2 border-foreground/10">
+                                            <AdvancedSettings
+                                                cachingEnabled={cachingEnabled}
+                                                cacheHitRate={cacheHitRate}
+                                                batchEnabled={batchEnabled}
+                                                onCachingChange={setCachingEnabled}
+                                                onCacheHitRateChange={setCacheHitRate}
+                                                onBatchChange={setBatchEnabled}
+                                                anyCachingSupported={anyCachingSupported}
+                                                anyBatchSupported={anyBatchSupported}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -349,24 +425,15 @@ export default function PlaygroundPage() {
                     {/* Cards Container */}
                     <div className="flex justify-between gap-[20px] mt-[10px]">
                         {/* Estimate mode: show estimate cards */}
-                        {mode === 'estimate' && estimateResult && Array.isArray(estimateResult.estimates) ? (
-                            (() => {
-                                const cheapestId = estimateResult.estimates.reduce<string | null>((cheapId, est) => {
-                                    if (!cheapId) return est.modelId;
-                                    const cheapEst = estimateResult.estimates.find(e => e.modelId === cheapId);
-                                    if (!cheapEst) return est.modelId;
-                                    return est.total.median * requestsPerMonth < cheapEst.total.median * requestsPerMonth
-                                        ? est.modelId : cheapId;
-                                }, null);
-                                return estimateResult.estimates.map((estimate) => (
-                                    <EstimateCard
-                                        key={estimate.modelId}
-                                        estimate={estimate}
-                                        isCheapest={estimate.modelId === cheapestId}
-                                        requestsPerMonth={requestsPerMonth}
-                                    />
-                                ));
-                            })()
+                        {mode === 'estimate' && enrichedEstimates && enrichedEstimates.estimates.length > 0 ? (
+                            enrichedEstimates.estimates.map((estimate) => (
+                                <EstimateCard
+                                    key={estimate.modelId}
+                                    estimate={estimate}
+                                    isCheapest={estimate.modelId === enrichedEstimates.cheapest}
+                                    requestsPerMonth={requestsPerMonth}
+                                />
+                            ))
                         ) : mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0 ? (
                             /* Sample mode: show response cards */
                             sampleResult.results.map((result, idx) => (

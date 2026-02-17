@@ -18,6 +18,7 @@ export interface ModelConfig {
   qualityRating: 1 | 2 | 3 | 4 | 5;
   modality?: 'text' | 'image' | 'video' | 'audio' | 'embedding'; // Default: 'text'
   apiEndpoint?: 'chat' | 'responses' | 'completions' | 'images' | 'video'; // For OpenAI: which endpoint to use
+  batchDiscount?: number; // 0-1, e.g. 0.5 = 50% off (OpenAI, Anthropic Batch API)
   pricingTiers?: {
     range: string;
     inputPrice: number;
