@@ -287,21 +287,19 @@ export default function PlaygroundPage() {
                     {/* Mode Toggle + Requests/Month */}
                     <div className="mb-4 flex items-center gap-4">
                         <ModeToggle value={mode} onChange={setMode} />
-                        {mode === 'estimate' && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <label htmlFor="requests-per-month" className="text-foreground/60 whitespace-nowrap">
-                                    Requests/month:
-                                </label>
-                                <input
-                                    id="requests-per-month"
-                                    type="number"
-                                    min={1}
-                                    value={requestsPerMonth}
-                                    onChange={(e) => setRequestsPerMonth(Math.max(1, parseInt(e.target.value) || 1))}
-                                    className="w-[100px] bg-background border border-foreground/20 rounded px-2 py-1 text-foreground text-sm"
-                                />
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2 text-sm">
+                            <label htmlFor="requests-per-month" className="text-foreground/60 whitespace-nowrap">
+                                Requests/month:
+                            </label>
+                            <input
+                                id="requests-per-month"
+                                type="number"
+                                min={1}
+                                value={requestsPerMonth}
+                                onChange={(e) => setRequestsPerMonth(Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-[100px] bg-background border border-foreground/20 rounded px-2 py-1 text-foreground text-sm"
+                            />
+                        </div>
                     </div>
 
                     {/* Conditional Controls based on mode */}
@@ -378,7 +376,7 @@ export default function PlaygroundPage() {
                         ) : mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0 ? (
                             /* Sample mode: show response cards */
                             sampleResult.results.map((result, idx) => (
-                                <ResponseCard key={idx} result={result} />
+                                <ResponseCard key={idx} result={result} requestsPerMonth={requestsPerMonth} />
                             ))
                         ) : (
                             /* No results: show selected model cards or placeholders */

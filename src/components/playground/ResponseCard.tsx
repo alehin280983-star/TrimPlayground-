@@ -5,9 +5,10 @@ import { formatCost, formatTokens } from '@/lib/tokens';
 
 interface ResponseCardProps {
     result: SampleResultV2 | PriceEstimateV2;
+    requestsPerMonth?: number;
 }
 
-export default function ResponseCard({ result }: ResponseCardProps) {
+export default function ResponseCard({ result, requestsPerMonth = 1000 }: ResponseCardProps) {
     const isSample = 'actualCost' in result;
     const isEstimate = !isSample;
     const sampleMedia = isSample ? result.media : undefined;
@@ -104,6 +105,14 @@ export default function ResponseCard({ result }: ResponseCardProps) {
                                 </>
                             )}
                         </div>
+                        {!isFree && (
+                            <div className="mt-2 pt-2 border-t border-foreground/10 text-sm font-semibold text-foreground">
+                                Est. monthly cost: {formatCost(result.actualCost * requestsPerMonth)}
+                                <span className="text-[0.65rem] font-normal text-foreground/40 ml-1">
+                                    ({requestsPerMonth.toLocaleString()} req/mo)
+                                </span>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <>
