@@ -85,7 +85,7 @@ export default function PlaygroundPage() {
     const [mode, setMode] = useState<CalculationMode>('estimate');
     const [expectedOutput, setExpectedOutput] = useState<number | undefined>(undefined);
     const [requestsPerMonth, setRequestsPerMonth] = useState(1000);
-    const [isPanelOpen, setIsPanelOpen] = useState(false);
+    const [expandedProvider, setExpandedProvider] = useState<ProviderType | null>(null);
 
     const allModels = getAllModels();
     const visibleModels = mode === 'sample' ? allModels.filter(isSampleSupportedModel) : allModels;
@@ -95,14 +95,17 @@ export default function PlaygroundPage() {
         setSelectedModels(prev => prev.filter(isSampleSupportedModel));
     }, [mode]);
 
-    // Group models by Category -> Provider for the sidebar
-    const modelsByCategory = visibleModels.reduce((acc, model) => {
+    // Group models by Provider -> Category for the sidebar
+    const modelsByProvider = visibleModels.reduce((acc, model) => {
+        if (!acc[model.provider]) acc[model.provider] = {} as Record<ModelCategory, ModelConfig[]>;
         const category = getModelCategory(model);
-        if (!acc[category]) acc[category] = {} as Record<ProviderType, ModelConfig[]>;
-        if (!acc[category][model.provider]) acc[category][model.provider] = [];
-        acc[category][model.provider].push(model);
+        if (!acc[model.provider][category]) acc[model.provider][category] = [];
+        acc[model.provider][category].push(model);
         return acc;
-    }, {} as Record<ModelCategory, Record<ProviderType, ModelConfig[]>>);
+    }, {} as Record<ProviderType, Record<ModelCategory, ModelConfig[]>>);
+
+    const providerEntries = (Object.keys(modelsByProvider) as ProviderType[])
+        .sort((a, b) => PROVIDER_LABELS[a].localeCompare(PROVIDER_LABELS[b]));
 
     const handleModelToggle = (model: ModelConfig) => {
         setSelectedModels(prev => {
@@ -191,77 +194,74 @@ export default function PlaygroundPage() {
 
             <div className="flex p-10 gap-10 max-w-[1400px] mx-auto box-border h-[calc(100vh-60px)]">
 
-                {/* LEFT COLUMN - Collapsible */}
-                {isPanelOpen ? (
-                    <div className="w-[30%] flex flex-col gap-5 h-full transition-all duration-300">
-                        <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
-                            <div className="bg-foreground text-background p-[15px] font-bold text-center uppercase text-sm flex items-center justify-between">
-                                <span>Model Reference</span>
-                                <button
-                                    onClick={() => setIsPanelOpen(false)}
-                                    className="text-background/70 hover:text-background text-lg leading-none"
-                                    title="Collapse panel"
-                                >
-                                    ◀
-                                </button>
-                            </div>
-                            <div className="p-[15px] overflow-y-auto h-full">
-                                {CATEGORY_ORDER.map((category) => {
-                                    const providersInCategory = modelsByCategory[category];
-                                    if (!providersInCategory) return null;
-
-                                    const providerEntries = Object.entries(providersInCategory)
-                                        .sort(([a], [b]) => PROVIDER_LABELS[a as ProviderType].localeCompare(PROVIDER_LABELS[b as ProviderType]));
-
-                                    if (providerEntries.length === 0) return null;
-
-                                    return (
-                                        <div key={category} className="mb-6">
-                                            <div className="font-extrabold border-b border-foreground/20 pb-1 mb-3 text-[0.82rem] uppercase tracking-wide opacity-80">
-                                                {CATEGORY_LABELS[category]}
-                                            </div>
-                                            {providerEntries.map(([provider, models]) => (
-                                                <div key={`${category}-${provider}`} className="mb-4">
-                                                    <div className="font-bold border-b border-foreground/10 pb-1 mb-2 text-[0.78rem] uppercase opacity-50">
-                                                        {PROVIDER_LABELS[provider as ProviderType]}
-                                                    </div>
-                                                    {[...models].sort((a, b) => a.name.localeCompare(b.name)).map(model => (
-                                                        <div
-                                                            key={model.id}
-                                                            onClick={() => handleModelToggle(model)}
-                                                            className={`
-                                                                text-[0.85rem] py-1.5 cursor-pointer hover:text-foreground transition-colors
-                                                                ${selectedModels.find(m => m.id === model.id) ? 'font-bold text-foreground' : 'text-foreground/60'}
-                                                            `}
-                                                        >
-                                                            {model.name} {selectedModels.find(m => m.id === model.id) && '(Selected)'}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div
-                        className="w-[48px] flex flex-col items-center bg-foreground text-background rounded-lg cursor-pointer hover:opacity-90 transition-opacity shadow-sm h-full"
-                        onClick={() => setIsPanelOpen(true)}
-                        title="Expand model panel"
-                    >
-                        <div className="writing-mode-vertical text-xs font-bold uppercase tracking-widest py-4 flex-grow flex items-center"
-                            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
-                        >
+                {/* LEFT COLUMN - Static provider list */}
+                <div className="shrink-0 flex flex-col h-full">
+                    <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
+                        <div className="bg-foreground text-background px-4 py-3 font-bold uppercase text-sm text-center">
                             Models
                         </div>
-                        <div className="pb-3 text-lg">▶</div>
+                        <div className="px-3 py-2 overflow-y-auto h-full">
+                            {providerEntries.map((provider) => {
+                                const isExpanded = expandedProvider === provider;
+                                const categories = modelsByProvider[provider];
+                                const modelCount = Object.values(categories).reduce((sum, arr) => sum + arr.length, 0);
+                                const selectedCount = visibleModels.filter(m => m.provider === provider && selectedModels.find(s => s.id === m.id)).length;
+
+                                return (
+                                    <div key={provider} className="mb-1">
+                                        <button
+                                            onClick={() => setExpandedProvider(isExpanded ? null : provider)}
+                                            className="w-full flex items-center justify-between px-2 py-2 rounded hover:bg-foreground/5 transition-colors text-left"
+                                        >
+                                            <span className="text-[0.82rem] font-bold text-foreground/80">
+                                                {isExpanded ? '▼' : '▶'} {PROVIDER_LABELS[provider]}
+                                            </span>
+                                            <span className="text-[0.65rem] text-foreground/40">
+                                                {selectedCount > 0 && <span className="text-foreground font-bold mr-1">{selectedCount}/</span>}
+                                                {modelCount}
+                                            </span>
+                                        </button>
+                                        {isExpanded && (
+                                            <div className="pl-3 pb-2">
+                                                {CATEGORY_ORDER.map((category) => {
+                                                    const models = categories[category];
+                                                    if (!models || models.length === 0) return null;
+                                                    const showCategoryLabel = Object.keys(categories).length > 1;
+                                                    return (
+                                                        <div key={category} className="mb-2">
+                                                            {showCategoryLabel && (
+                                                                <div className="text-[0.65rem] text-foreground/40 uppercase font-bold mt-1 mb-1 px-2">
+                                                                    {CATEGORY_LABELS[category]}
+                                                                </div>
+                                                            )}
+                                                            {[...models].sort((a, b) => a.name.localeCompare(b.name)).map(model => (
+                                                                <div
+                                                                    key={model.id}
+                                                                    onClick={() => handleModelToggle(model)}
+                                                                    className={`
+                                                                        text-[0.8rem] py-1 px-2 rounded cursor-pointer transition-colors whitespace-nowrap
+                                                                        ${selectedModels.find(m => m.id === model.id)
+                                                                            ? 'font-bold text-foreground bg-foreground/10'
+                                                                            : 'text-foreground/60 hover:text-foreground hover:bg-foreground/5'}
+                                                                    `}
+                                                                >
+                                                                    {model.name}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                )}
+                </div>
 
                 {/* RIGHT COLUMN */}
-                <div className={`${isPanelOpen ? 'w-[70%]' : 'flex-1'} flex flex-col`}>
+                <div className="flex-1 min-w-0 flex flex-col">
 
                     {/* Selected Tags */}
                     <div className="text-[0.8rem] text-foreground mb-[10px] font-bold flex gap-[10px] min-h-[24px]">
@@ -336,13 +336,7 @@ export default function PlaygroundPage() {
                     )}
 
                     {/* Controls */}
-                    <div className="flex justify-between items-center mb-[30px]">
-                        <button
-                            onClick={() => setIsPanelOpen(prev => !prev)}
-                            className="bg-transparent border border-foreground/40 text-foreground px-[24px] py-[10px] rounded-full font-semibold hover:bg-foreground/5 transition-colors"
-                        >
-                            {isPanelOpen ? '◀ Hide Models' : '▶ Select Models'}
-                        </button>
+                    <div className="flex justify-end items-center mb-[30px]">
                         <button
                             onClick={handleCompare}
                             disabled={isLoading || selectedModels.length === 0 || (mode === 'sample' && !isSignedIn)}
