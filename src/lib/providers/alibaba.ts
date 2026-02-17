@@ -284,12 +284,27 @@ export class AlibabaProvider extends BaseProvider {
         return 2;
     }
 
+    private static readonly REGION_RESTRICTED_MODELS: Record<string, string> = {
+        'qwen-deep-research': 'Beijing region only (dashscope.aliyuncs.com)',
+        'qwen-math-plus': 'may require activation in DashScope console',
+    };
+
     private parseAlibabaError(error: unknown, model: string): CompletionError {
         if (!(error instanceof Error)) {
             return this.parseError(error, model);
         }
 
         const message = error.message.toLowerCase();
+
+        // Check if this is a known region-restricted model
+        const regionNote = AlibabaProvider.REGION_RESTRICTED_MODELS[model];
+        if (regionNote) {
+            return this.createError(
+                model,
+                'invalid_request',
+                `Model "${model}" is not available — ${regionNote}. Check your DashScope console for access.`
+            );
+        }
 
         // For Alibaba, 403/forbidden is often model/workspace/region permission,
         // not API key invalidation. Show a model-access message first.
