@@ -1639,32 +1639,6 @@ const qwenModels: ModelConfig[] = [
         qualityRating: 4,
     },
     {
-        id: 'qvq-max-latest',
-        name: 'QVQ Max',
-        provider: 'alibaba',
-        inputPrice: 0.001147, // $1.147 / 1M
-        outputPrice: 0.004588, // $4.588 / 1M
-        maxTokens: 128000,
-        maxOutputTokens: 8192,
-        freeTierAvailable: false,
-        description: 'Top-tier visual reasoning model',
-        speedRating: 2,
-        qualityRating: 5,
-    },
-    {
-        id: 'qvq-plus-latest',
-        name: 'QVQ Plus',
-        provider: 'alibaba',
-        inputPrice: 0.000287, // $0.287 / 1M
-        outputPrice: 0.000717, // $0.717 / 1M
-        maxTokens: 128000,
-        maxOutputTokens: 8192,
-        freeTierAvailable: false,
-        description: 'Balanced visual reasoning model',
-        speedRating: 3,
-        qualityRating: 4,
-    },
-    {
         id: 'qwen3-vl-plus',
         name: 'Qwen3 VL Plus',
         provider: 'alibaba',
