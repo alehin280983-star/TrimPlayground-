@@ -60,6 +60,8 @@ function isSampleSupportedModel(model: ModelConfig): boolean {
     if (id.includes('realtime')) return false;
     // OCR models require image/document input and a dedicated OCR endpoint.
     if (id.includes('ocr')) return false;
+    // QVQ visual reasoning models require image input.
+    if (id.includes('qvq')) return false;
     const modality = model.modality ?? 'text';
     return SAMPLE_SUPPORTED_MODALITIES[model.provider].includes(modality);
 }

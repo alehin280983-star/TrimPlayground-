@@ -49,6 +49,8 @@ function isSupportedInSampleMode(modelId: string): boolean {
     if (id.includes('ocr')) return false;
     // Deep Research models require multi-turn dialog and region-specific endpoints.
     if (id.includes('deep-research')) return false;
+    // QVQ visual reasoning models require image input — text-only prompts fail.
+    if (id.includes('qvq')) return false;
     return true;
 }
 
@@ -111,9 +113,14 @@ export async function POST(request: NextRequest) {
             const modality = model.modality ?? 'text';
 
             if (!isSupportedInSampleMode(modelId)) {
-                const unsupportedReason = modelId.toLowerCase().includes('ocr')
+                const idLower = modelId.toLowerCase();
+                const unsupportedReason = idLower.includes('ocr')
                     ? 'Sample mode does not support OCR models. OCR requires image/document input.'
-                    : 'Sample mode does not support realtime models. Use Estimate mode for cost checks.';
+                    : idLower.includes('qvq')
+                        ? 'QVQ models require image input. Text-only sample is not supported.'
+                        : idLower.includes('deep-research')
+                            ? 'Deep Research models require multi-turn dialog. Use Estimate mode.'
+                            : 'Sample mode does not support realtime models. Use Estimate mode for cost checks.';
                 results.push({
                     modelId,
                     modelName: model.name,
