@@ -1,11 +1,8 @@
 import Link from 'next/link';
 import { Header, Footer } from '@/components/layout';
-import { getAllModels, providers } from '@/lib/config';
+import { providers } from '@/lib/config';
 
 export default function Home() {
-  const models = getAllModels();
-  const freeModels = models.filter(m => m.freeTierAvailable);
-
   return (
     <>
       <Header />
@@ -43,7 +40,7 @@ export default function Home() {
                 Start Comparing Free
               </Link>
               <Link
-                href="#calculator"
+                href="/calculator"
                 className="px-10 py-4 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground font-bold text-lg transition-all border border-foreground/10"
               >
                 Try Cost Calculator
@@ -96,4 +93,3 @@ export default function Home() {
     </>
   );
 }
-
