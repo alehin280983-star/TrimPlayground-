@@ -18,6 +18,7 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
   xai: 'xAI',
   alibaba: 'Alibaba Cloud',
   moonshot: 'Moonshot',
+  zhipu: 'Zhipu AI',
 };
 
 function clampNumber(value: number, min: number, max: number): number {
