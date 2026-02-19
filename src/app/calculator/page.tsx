@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Header, Footer } from '@/components/layout';
 import { getAllModels, getModelById } from '@/lib/config';
 import { calculateAgenticCost, type AgenticCostInputs, type WorkloadUnit } from '@/lib/calculator';
 import { formatCost, formatTokens } from '@/lib/tokens';
 import type { ProviderType } from '@/types';
+import { ExportButtons } from '@/components/calculator/ExportButtons';
 
 const PROVIDER_LABELS: Record<ProviderType, string> = {
   openai: 'OpenAI',
@@ -67,6 +68,8 @@ export default function CalculatorPage() {
   const [multLow, setMultLow] = useState(2);
   const [multMid, setMultMid] = useState(5);
   const [multHigh, setMultHigh] = useState(10);
+
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const model = useMemo(() => getModelById(modelId), [modelId]);
 
@@ -416,7 +419,7 @@ export default function CalculatorPage() {
 
             {/* Outputs */}
             <div className="flex flex-col gap-6">
-              <div className="bg-background border border-foreground/10 rounded-xl p-6 shadow-sm">
+              <div ref={resultsRef} className="bg-background border border-foreground/10 rounded-xl p-6 shadow-sm">
                 <h2 className="font-extrabold uppercase tracking-wider text-sm text-foreground/70 mb-4">
                   Results
                 </h2>
@@ -425,6 +428,24 @@ export default function CalculatorPage() {
                   <div className="text-foreground/60">Select a model to see estimates.</div>
                 ) : (
                   <>
+                    <ExportButtons
+                      model={model}
+                      scenarios={scenarios}
+                      uncertainty={uncertainty}
+                      inputs={{
+                        unit,
+                        requestsPerMonth,
+                        tasksPerMonth,
+                        llmCallsPerTask,
+                        inputTokens: inputTokensPerCall,
+                        outputTokens: outputTokensPerCall,
+                        cachingEnabled: enableCaching,
+                        cachedPct: cachedInputSharePct,
+                        batchEnabled: enableBatch,
+                        batchFactor: batchPriceFactor,
+                      }}
+                      resultsRef={resultsRef}
+                    />
                     <div className="grid grid-cols-2 gap-4 mb-6">
                       <div className="bg-foreground/5 border border-foreground/10 rounded-lg p-4">
                         <div className="text-[11px] font-bold uppercase tracking-wider text-foreground/50">LLM calls / month</div>
