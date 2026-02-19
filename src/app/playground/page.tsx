@@ -98,6 +98,10 @@ export default function PlaygroundPage() {
     const [refineOpen, setRefineOpen] = useState(false);
     const [advancedOpen, setAdvancedOpen] = useState(false);
 
+    // Constraint inputs for winner badge
+    const [maxLatencyMs, setMaxLatencyMs] = useState<number | null>(null);
+    const [maxBudget, setMaxBudget] = useState<number | null>(null);
+
     const resultsRef = useRef<HTMLDivElement>(null);
 
     const allModels = getAllModels();
@@ -149,6 +153,45 @@ export default function PlaygroundPage() {
         const sorted = sortEstimates(recomputed, priority);
         return { estimates: sorted, cheapest: findCheapest(sorted) };
     }, [estimateResult, outputRatio, customRatio, priority, cachingEnabled, cacheHitRate, batchEnabled, requestsPerMonth]);
+
+    // Winner computation for badges
+    const winners = useMemo(() => {
+        let cheapest: string | null = null;
+        let fastest: string | null = null;
+
+        if (mode === 'estimate' && enrichedEstimates) {
+            const filtered = maxBudget != null
+                ? enrichedEstimates.estimates.filter(e => e.monthlyCost.median / requestsPerMonth <= maxBudget)
+                : enrichedEstimates.estimates;
+            if (filtered.length > 0) {
+                cheapest = filtered.reduce((best, e) =>
+                    e.monthlyCost.median < best.monthlyCost.median ? e : best
+                ).modelId;
+            }
+        } else if (mode === 'sample' && sampleResult?.results?.length) {
+            const results = sampleResult.results;
+            // Cheapest: filter by latency constraint, pick lowest cost
+            const forCheapest = maxLatencyMs != null
+                ? results.filter(r => r.latencyMs <= maxLatencyMs)
+                : results;
+            if (forCheapest.length > 0) {
+                cheapest = forCheapest.reduce((best, r) =>
+                    r.actualCost < best.actualCost ? r : best
+                ).modelId;
+            }
+            // Fastest: filter by budget constraint, pick lowest latency
+            const forFastest = maxBudget != null
+                ? results.filter(r => r.actualCost <= maxBudget)
+                : results;
+            if (forFastest.length > 0) {
+                fastest = forFastest.reduce((best, r) =>
+                    r.latencyMs < best.latencyMs ? r : best
+                ).modelId;
+            }
+        }
+
+        return { cheapest, fastest };
+    }, [mode, enrichedEstimates, sampleResult, maxLatencyMs, maxBudget, requestsPerMonth]);
 
     const anyCachingSupported = selectedModels.some(m => !!m.cachedInputPrice);
     const anyBatchSupported = selectedModels.some(m => !!m.batchDiscount);
@@ -439,6 +482,45 @@ export default function PlaygroundPage() {
                         </div>
                     )}
 
+                    {/* Constraint inputs for winner badges */}
+                    {((mode === 'estimate' && enrichedEstimates && enrichedEstimates.estimates.length > 0) ||
+                      (mode === 'sample' && sampleResult?.results?.length)) && (
+                        <div className="flex items-center gap-6 mb-3">
+                            {mode === 'sample' && (
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-foreground/50 whitespace-nowrap">
+                                        Max latency:
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        placeholder="—"
+                                        value={maxLatencyMs ?? ''}
+                                        onChange={(e) => setMaxLatencyMs(e.target.value ? Number(e.target.value) : null)}
+                                        className="w-[80px] bg-background border border-foreground/20 rounded px-2 py-1 text-foreground text-xs"
+                                    />
+                                    <span className="text-xs text-foreground/40">ms</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <label className="text-xs font-bold uppercase tracking-wider text-foreground/50 whitespace-nowrap">
+                                    Max budget:
+                                </label>
+                                <span className="text-xs text-foreground/40">$</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step="0.001"
+                                    placeholder="—"
+                                    value={maxBudget ?? ''}
+                                    onChange={(e) => setMaxBudget(e.target.value ? Number(e.target.value) : null)}
+                                    className="w-[80px] bg-background border border-foreground/20 rounded px-2 py-1 text-foreground text-xs"
+                                />
+                                <span className="text-xs text-foreground/40">/req</span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Cards Container */}
                     <div ref={resultsRef} className="flex justify-between gap-[20px] mt-[10px]">
                         {/* Estimate mode: show estimate cards */}
@@ -447,14 +529,22 @@ export default function PlaygroundPage() {
                                 <EstimateCard
                                     key={estimate.modelId}
                                     estimate={estimate}
-                                    isCheapest={estimate.modelId === enrichedEstimates.cheapest}
+                                    isCheapest={estimate.modelId === winners.cheapest}
                                     requestsPerMonth={requestsPerMonth}
                                 />
                             ))
                         ) : mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0 ? (
                             /* Sample mode: show response cards */
                             sampleResult.results.map((result, idx) => (
-                                <ResponseCard key={idx} result={result} requestsPerMonth={requestsPerMonth} />
+                                <ResponseCard
+                                    key={idx}
+                                    result={result}
+                                    requestsPerMonth={requestsPerMonth}
+                                    badges={[
+                                        ...(result.modelId === winners.cheapest ? ['cheapest' as const] : []),
+                                        ...(result.modelId === winners.fastest ? ['fastest' as const] : []),
+                                    ]}
+                                />
                             ))
                         ) : (
                             /* No results: show selected model cards or placeholders */

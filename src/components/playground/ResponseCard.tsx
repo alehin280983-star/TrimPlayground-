@@ -6,9 +6,10 @@ import { formatCost, formatTokens } from '@/lib/tokens';
 interface ResponseCardProps {
     result: SampleResultV2 | PriceEstimateV2;
     requestsPerMonth?: number;
+    badges?: Array<'cheapest' | 'fastest'>;
 }
 
-export default function ResponseCard({ result, requestsPerMonth = 1000 }: ResponseCardProps) {
+export default function ResponseCard({ result, requestsPerMonth = 1000, badges = [] }: ResponseCardProps) {
     const isSample = 'actualCost' in result;
     const isEstimate = !isSample;
     const sampleMedia = isSample ? result.media : undefined;
@@ -33,9 +34,15 @@ export default function ResponseCard({ result, requestsPerMonth = 1000 }: Respon
             : result.breakdown.output.tokens.median);
 
     return (
-        <div className="flex-1 flex flex-col shadow-sm rounded-lg overflow-hidden bg-background border border-foreground/10">
+        <div className={`
+            flex-1 flex flex-col shadow-sm rounded-lg overflow-hidden bg-background border transition-transform duration-300 hover:-translate-y-1
+            ${badges.includes('cheapest') ? 'border-green-500 ring-2 ring-green-500/20' : badges.includes('fastest') ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-foreground/10'}
+        `}>
             {/* Header */}
-            <div className="bg-foreground text-background p-[15px] flex flex-col h-[60px] justify-center">
+            <div className={`
+                text-background p-[15px] flex flex-col h-[60px] justify-center relative
+                ${badges.includes('cheapest') ? 'bg-green-600' : badges.includes('fastest') ? 'bg-blue-600' : 'bg-foreground'}
+            `}>
                 <div className="text-[1rem] font-bold uppercase tracking-wider">
                     {result.modelName}
                 </div>
@@ -43,6 +50,20 @@ export default function ResponseCard({ result, requestsPerMonth = 1000 }: Respon
                     {`${formatCost(displayCost)} • ${formatTokens(displayTokens)} total tokens`}
                     {isEstimate && ` (est)`}
                 </div>
+                {badges.length > 0 && (
+                    <div className="absolute top-1 right-2 flex flex-col gap-1">
+                        {badges.includes('cheapest') && (
+                            <div className="bg-white text-green-600 px-2 py-0.5 rounded text-[0.65rem] font-bold">
+                                CHEAPEST
+                            </div>
+                        )}
+                        {badges.includes('fastest') && (
+                            <div className="bg-white text-blue-600 px-2 py-0.5 rounded text-[0.65rem] font-bold">
+                                FASTEST
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Body */}
