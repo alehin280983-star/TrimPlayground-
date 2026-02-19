@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { Header } from '@/components/layout';
@@ -8,6 +8,7 @@ import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, RatioSe
 import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, ProviderType, OutputInputRatio, PriorityMode } from '@/types';
 import { getAllModels } from '@/lib/config';
 import { recomputeEstimate, sortEstimates, findCheapest, EnrichedEstimate } from '@/lib/estimate-calculator';
+import { PlaygroundExportButtons } from '@/components/playground/PlaygroundExportButtons';
 
 type ModelCategory = 'text_code' | 'image' | 'audio' | 'video' | 'embedding';
 
@@ -96,6 +97,8 @@ export default function PlaygroundPage() {
     const [batchEnabled, setBatchEnabled] = useState(false);
     const [refineOpen, setRefineOpen] = useState(false);
     const [advancedOpen, setAdvancedOpen] = useState(false);
+
+    const resultsRef = useRef<HTMLDivElement>(null);
 
     const allModels = getAllModels();
     const visibleModels = mode === 'sample' ? allModels.filter(isSampleSupportedModel) : allModels;
@@ -422,8 +425,22 @@ export default function PlaygroundPage() {
                         </button>
                     </div>
 
+                    {/* Export Buttons */}
+                    {((mode === 'estimate' && enrichedEstimates && enrichedEstimates.estimates.length > 0) ||
+                      (mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0)) && (
+                        <div className="flex justify-end mb-2">
+                            <PlaygroundExportButtons
+                                mode={mode}
+                                estimates={enrichedEstimates?.estimates ?? null}
+                                sampleResults={sampleResult?.results ?? null}
+                                requestsPerMonth={requestsPerMonth}
+                                resultsRef={resultsRef}
+                            />
+                        </div>
+                    )}
+
                     {/* Cards Container */}
-                    <div className="flex justify-between gap-[20px] mt-[10px]">
+                    <div ref={resultsRef} className="flex justify-between gap-[20px] mt-[10px]">
                         {/* Estimate mode: show estimate cards */}
                         {mode === 'estimate' && enrichedEstimates && enrichedEstimates.estimates.length > 0 ? (
                             enrichedEstimates.estimates.map((estimate) => (
