@@ -27,8 +27,13 @@ function clampNumber(value: number, min: number, max: number): number {
 }
 
 function toNumber(value: string): number {
-  const num = Number(value);
+  const cleaned = value.replace(/^0+(?=\d)/, '');
+  const num = Number(cleaned);
   return Number.isFinite(num) ? num : 0;
+}
+
+function numStr(value: number): string {
+  return String(value);
 }
 
 export default function CalculatorPage() {
@@ -230,8 +235,8 @@ export default function CalculatorPage() {
                     <label className="flex flex-col gap-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">Requests / month</span>
                       <input
-                        type="number"
-                        min={0}
+                        type="text"
+                        inputMode="numeric"
                         value={requestsPerMonth}
                         onChange={(e) => setRequestsPerMonth(toNumber(e.target.value))}
                         className="px-3 py-2 rounded-lg bg-background border border-foreground/15"
@@ -242,8 +247,8 @@ export default function CalculatorPage() {
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">Tasks / month</span>
                         <input
-                          type="number"
-                          min={0}
+                          type="text"
+                          inputMode="numeric"
                           value={tasksPerMonth}
                           onChange={(e) => setTasksPerMonth(toNumber(e.target.value))}
                           className="px-3 py-2 rounded-lg bg-background border border-foreground/15"
@@ -252,9 +257,8 @@ export default function CalculatorPage() {
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">LLM calls / task</span>
                         <input
-                          type="number"
-                          min={0}
-                          step={0.5}
+                          type="text"
+                          inputMode="decimal"
                           value={llmCallsPerTask}
                           onChange={(e) => setLlmCallsPerTask(toNumber(e.target.value))}
                           className="px-3 py-2 rounded-lg bg-background border border-foreground/15"
@@ -272,8 +276,8 @@ export default function CalculatorPage() {
                   <label className="flex flex-col gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">Input tokens</span>
                     <input
-                      type="number"
-                      min={0}
+                      type="text"
+                      inputMode="numeric"
                       value={inputTokensPerCall}
                       onChange={(e) => setInputTokensPerCall(toNumber(e.target.value))}
                       className="px-3 py-2 rounded-lg bg-background border border-foreground/15"
@@ -282,8 +286,8 @@ export default function CalculatorPage() {
                   <label className="flex flex-col gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">Output tokens</span>
                     <input
-                      type="number"
-                      min={0}
+                      type="text"
+                      inputMode="numeric"
                       value={outputTokensPerCall}
                       onChange={(e) => setOutputTokensPerCall(toNumber(e.target.value))}
                       className="px-3 py-2 rounded-lg bg-background border border-foreground/15"
@@ -322,12 +326,11 @@ export default function CalculatorPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <input
-                          type="number"
-                          min={0}
-                          max={100}
+                          type="text"
+                          inputMode="numeric"
                           disabled={!enableCaching}
                           value={cachedInputSharePct}
-                          onChange={(e) => setCachedInputSharePct(toNumber(e.target.value))}
+                          onChange={(e) => setCachedInputSharePct(clampNumber(toNumber(e.target.value), 0, 100))}
                           className="w-[72px] px-2 py-1.5 rounded-md bg-background border border-foreground/15 disabled:opacity-40"
                         />
                         <span className="text-xs text-foreground/50">%</span>
@@ -354,10 +357,8 @@ export default function CalculatorPage() {
                         Batch factor
                       </div>
                       <input
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.05}
+                        type="text"
+                        inputMode="decimal"
                         disabled={!enableBatch}
                         value={batchPriceFactor}
                         onChange={(e) => setBatchPriceFactor(clampNumber(toNumber(e.target.value), 0, 1))}
@@ -399,9 +400,8 @@ export default function CalculatorPage() {
                           {item.label}
                         </span>
                         <input
-                          type="number"
-                          min={1}
-                          step={0.5}
+                          type="text"
+                          inputMode="decimal"
                           disabled={!showUncertaintyRange}
                           value={item.value}
                           onChange={(e) => item.set(Math.max(1, toNumber(e.target.value)))}
