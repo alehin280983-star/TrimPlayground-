@@ -67,6 +67,9 @@ export default function ModelCard({ model, isFeatured }: ModelCardProps) {
                         : (model.pricePerSecond ? 'Video Generation' : 'Image Generation')
                     }
                 </div>
+                <div className="text-center text-[0.65rem] text-foreground/40 mt-1">
+                    Price updated: {model.priceUpdatedAt}
+                </div>
             </div>
         </div>
     );
