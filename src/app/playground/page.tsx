@@ -334,6 +334,9 @@ export default function PlaygroundPage() {
                                                                     `}
                                                                 >
                                                                     {model.name}
+                                                                    <span className="text-[0.6rem] text-foreground/30 ml-1">
+                                                                        — {model.priceUpdatedAt.split('-').reverse().join('.')}
+                                                                    </span>
                                                                 </div>
                                                             ))}
                                                         </div>

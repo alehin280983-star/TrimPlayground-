@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
                     maxOutputTokens: m.maxOutputTokens,
                     freeTierAvailable: m.freeTierAvailable,
                     description: m.description,
+                    priceUpdatedAt: m.priceUpdatedAt,
                     speedRating: m.speedRating,
                     qualityRating: m.qualityRating,
                 })),
