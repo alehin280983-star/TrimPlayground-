@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { redis } from '@/lib/rate-limit';
 import { formatCost, formatTokens } from '@/lib/tokens';
+import ShareCopyButtons from '@/components/share/ShareCopyButtons';
 
 interface SharePayload {
     mode: 'estimate' | 'sample';
@@ -22,11 +24,35 @@ interface ShareModel {
     confidence?: string;
 }
 
+async function getShareData(id: string): Promise<SharePayload | null> {
+    const raw = await redis.get(`share:${id}`);
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : (raw as SharePayload);
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+    const { id } = await params;
+    const data = await getShareData(id);
+    if (!data) return { title: 'Trim Playground — Link Expired' };
+
+    const modelNames = data.models.map((m) => m.modelName).join(' vs ');
+    return {
+        title: `Trim Playground — ${modelNames}`,
+        description: `${data.mode} comparison: ${modelNames} at ${data.requestsPerMonth} req/mo`,
+        openGraph: {
+            title: `Trim Playground — ${modelNames}`,
+            description: `${data.mode} comparison at ${data.requestsPerMonth} req/mo`,
+            type: 'website',
+        },
+        twitter: { card: 'summary_large_image' },
+    };
+}
+
 export default async function SharePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const raw = await redis.get(`share:${id}`);
+    const data = await getShareData(id);
 
-    if (!raw) {
+    if (!data) {
         return (
             <div className="min-h-screen bg-background font-sans text-foreground flex flex-col items-center justify-center p-8">
                 <div className="text-center max-w-md">
@@ -45,8 +71,6 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
             </div>
         );
     }
-
-    const data: SharePayload = typeof raw === 'string' ? JSON.parse(raw) : raw as SharePayload;
 
     return (
         <div className="min-h-screen bg-background font-sans text-foreground">
@@ -186,8 +210,13 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
                     })}
                 </div>
 
+                {/* Copy buttons */}
+                <div className="mt-6">
+                    <ShareCopyButtons data={data} shareId={id} />
+                </div>
+
                 {/* Footer */}
-                <div className="mt-8 text-center text-xs text-foreground/30">
+                <div className="mt-6 text-center text-xs text-foreground/30">
                     Shared via <Link href="/playground" className="underline hover:text-foreground/50">Trim Playground</Link>
                 </div>
             </div>
