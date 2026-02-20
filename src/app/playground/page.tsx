@@ -458,7 +458,7 @@ export default function PlaygroundPage() {
                     )}
 
                     {/* Controls */}
-                    <div className="flex justify-end items-center mb-[30px]">
+                    <div className="flex justify-end items-center gap-3 mb-[30px]">
                         <button
                             onClick={handleCompare}
                             disabled={isLoading || selectedModels.length === 0 || (mode === 'sample' && !isSignedIn)}
@@ -478,6 +478,8 @@ export default function PlaygroundPage() {
                                 sampleResults={sampleResult?.results ?? null}
                                 requestsPerMonth={requestsPerMonth}
                                 resultsRef={resultsRef}
+                                prompt={prompt}
+                                winners={winners}
                             />
                         </div>
                     )}

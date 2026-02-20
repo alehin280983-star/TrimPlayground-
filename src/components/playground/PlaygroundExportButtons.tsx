@@ -5,12 +5,26 @@ import { formatCost } from '@/lib/tokens';
 import type { EnrichedEstimate } from '@/lib/estimate-calculator';
 import type { SampleResultV2 } from '@/types';
 
+interface ShareModel {
+  modelId: string;
+  modelName: string;
+  provider: string;
+  cost: number;
+  monthlyCost: number;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs?: number;
+  confidence?: string;
+}
+
 interface PlaygroundExportButtonsProps {
   mode: 'estimate' | 'sample';
   estimates: EnrichedEstimate[] | null;
   sampleResults: SampleResultV2[] | null;
   requestsPerMonth: number;
   resultsRef: React.RefObject<HTMLDivElement | null>;
+  prompt: string;
+  winners: { cheapest: string | null; fastest: string | null };
 }
 
 function buildPlaygroundData(props: PlaygroundExportButtonsProps) {
@@ -54,6 +68,41 @@ function buildPlaygroundData(props: PlaygroundExportButtonsProps) {
   return null;
 }
 
+function buildShareModels(props: PlaygroundExportButtonsProps): ShareModel[] {
+  const { mode, estimates, sampleResults, requestsPerMonth } = props;
+
+  if (mode === 'estimate' && estimates) {
+    return estimates.map((e) => ({
+      modelId: e.modelId,
+      modelName: e.modelName,
+      provider: e.provider,
+      cost: e.total.median,
+      monthlyCost: e.monthlyCost.median,
+      inputTokens: e.breakdown.input.tokens,
+      outputTokens: typeof e.breakdown.output.tokens === 'number'
+        ? e.breakdown.output.tokens
+        : e.breakdown.output.tokens.median,
+      confidence: e.confidence,
+    }));
+  }
+
+  if (mode === 'sample' && sampleResults) {
+    return sampleResults.map((r) => ({
+      modelId: r.modelId,
+      modelName: r.modelName,
+      provider: r.provider,
+      cost: r.actualCost,
+      monthlyCost: r.actualCost * requestsPerMonth,
+      inputTokens: r.actualUsage.inputTokens,
+      outputTokens: r.actualUsage.outputTokens,
+      latencyMs: r.latencyMs,
+      confidence: r.confidence,
+    }));
+  }
+
+  return [];
+}
+
 function buildMarkdown(props: PlaygroundExportButtonsProps): string {
   const { mode, estimates, sampleResults, requestsPerMonth } = props;
   const lines: string[] = [];
@@ -91,6 +140,8 @@ const btnBase =
 
 export function PlaygroundExportButtons(props: PlaygroundExportButtonsProps) {
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   async function handleMarkdown() {
     const md = buildMarkdown(props);
@@ -127,8 +178,40 @@ export function PlaygroundExportButtons(props: PlaygroundExportButtonsProps) {
     });
   }
 
+  async function handleShare() {
+    setSharing(true);
+    try {
+      const models = buildShareModels(props);
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: props.mode,
+          prompt: props.prompt,
+          requestsPerMonth: props.requestsPerMonth,
+          models,
+          winners: props.winners,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.id) {
+        const url = `${window.location.origin}/share/${data.id}`;
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      }
+    } catch (e) {
+      console.error('Share failed:', e);
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <div className="flex gap-2">
+      <button type="button" onClick={handleShare} disabled={sharing} className={btnBase}>
+        {shareCopied ? 'Link Copied!' : sharing ? 'Sharing...' : 'Share'}
+      </button>
       <button type="button" onClick={handleMarkdown} className={btnBase}>
         {copied ? 'Copied!' : 'Markdown'}
       </button>
