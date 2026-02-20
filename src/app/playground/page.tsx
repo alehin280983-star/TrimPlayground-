@@ -470,7 +470,7 @@ export default function PlaygroundPage() {
 
                     {/* Export Buttons */}
                     {((mode === 'estimate' && enrichedEstimates && enrichedEstimates.estimates.length > 0) ||
-                      (mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.length > 0)) && (
+                      (mode === 'sample' && sampleResult && sampleResult.results && sampleResult.results.some(r => r.actualUsage.inputTokens > 0 || r.actualUsage.outputTokens > 0))) && (
                         <div className="flex justify-end mb-2">
                             <PlaygroundExportButtons
                                 mode={mode}
@@ -486,7 +486,7 @@ export default function PlaygroundPage() {
 
                     {/* Constraint inputs for winner badges */}
                     {((mode === 'estimate' && enrichedEstimates && enrichedEstimates.estimates.length > 0) ||
-                      (mode === 'sample' && sampleResult?.results?.length)) && (
+                      (mode === 'sample' && sampleResult?.results?.some(r => r.actualUsage.inputTokens > 0 || r.actualUsage.outputTokens > 0))) && (
                         <div className="flex items-center gap-6 mb-3">
                             {mode === 'sample' && (
                                 <div className="flex items-center gap-2">
