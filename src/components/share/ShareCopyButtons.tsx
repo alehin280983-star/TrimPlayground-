@@ -85,9 +85,10 @@ interface Props {
 }
 
 export default function ShareCopyButtons({ data, shareId }: Props) {
-    const shareUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/share/${shareId}`
-        : `/share/${shareId}`;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${origin}/share/${shareId}`;
+    const slackUrl = `${shareUrl}?utm_source=slack&utm_medium=copy`;
+    const mdUrl = `${shareUrl}?utm_source=markdown&utm_medium=copy`;
     const [copied, setCopied] = useState<string | null>(null);
 
     const copy = async (text: string, label: string) => {
@@ -102,13 +103,13 @@ export default function ShareCopyButtons({ data, shareId }: Props) {
         <div className="flex gap-3 justify-center">
             <button
                 className={btnClass}
-                onClick={() => copy(buildSlack(data, shareUrl), 'slack')}
+                onClick={() => copy(buildSlack(data, slackUrl), 'slack')}
             >
                 {copied === 'slack' ? 'Copied!' : 'Copy for Slack'}
             </button>
             <button
                 className={btnClass}
-                onClick={() => copy(buildMarkdown(data, shareUrl), 'md')}
+                onClick={() => copy(buildMarkdown(data, mdUrl), 'md')}
             >
                 {copied === 'md' ? 'Copied!' : 'Copy Markdown'}
             </button>
