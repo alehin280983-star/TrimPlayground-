@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { formatCost } from '@/lib/tokens';
+import { usePostHog } from 'posthog-js/react';
 import type { EnrichedEstimate } from '@/lib/estimate-calculator';
 import type { SampleResultV2 } from '@/types';
 
@@ -142,6 +143,7 @@ export function PlaygroundExportButtons(props: PlaygroundExportButtonsProps) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const ph = usePostHog();
 
   async function handleMarkdown() {
     const md = buildMarkdown(props);
@@ -199,6 +201,11 @@ export function PlaygroundExportButtons(props: PlaygroundExportButtonsProps) {
         await navigator.clipboard.writeText(url);
         setShareCopied(true);
         setTimeout(() => setShareCopied(false), 2000);
+        ph?.capture('result_saved', {
+          mode: props.mode,
+          share_id: data.id,
+          model_count: buildShareModels(props).length,
+        });
       }
     } catch (e) {
       console.error('Share failed:', e);

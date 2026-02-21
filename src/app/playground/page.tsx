@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
+import { usePostHog } from 'posthog-js/react';
 import { Header } from '@/components/layout';
 import { ModelCard, PromptInput, ResponseCard, EstimateCard, ModeToggle, RatioSelector, PrioritySelector, AdvancedSettings } from '@/components/playground';
 import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, ProviderType, OutputInputRatio, PriorityMode } from '@/types';
@@ -70,6 +71,7 @@ function isSampleSupportedModel(model: ModelConfig): boolean {
 
 export default function PlaygroundPage() {
     const { isSignedIn } = useAuth();
+    const ph = usePostHog();
     const [selectedModels, setSelectedModels] = useState<ModelConfig[]>([]);
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -239,6 +241,18 @@ export default function PlaygroundPage() {
                         estimates,
                         cheapest: typeof data.data.cheapest === 'string' ? data.data.cheapest : '',
                     });
+                    ph?.capture('calculation_completed', {
+                        mode: 'estimate',
+                        model_count: estimates.length,
+                        model_ids: estimates.map(e => e.modelId),
+                        providers: [...new Set(estimates.map(e => e.provider))],
+                    });
+                    if (selectedModels.length >= 2) {
+                        ph?.capture('comparison_made', {
+                            mode: 'estimate',
+                            model_ids: selectedModels.map(m => m.id),
+                        });
+                    }
                 }
             } else {
                 // Sample mode - reload API keys from session storage before making the call
@@ -267,6 +281,23 @@ export default function PlaygroundPage() {
                 const data = await response.json();
                 if (data.success && data.data) {
                     setSampleResult(data.data);
+                    const successfulResults = (data.data.results ?? []).filter(
+                        (r: SampleResultV2) => r.actualUsage.inputTokens > 0 || r.actualUsage.outputTokens > 0
+                    );
+                    if (successfulResults.length > 0) {
+                        ph?.capture('calculation_completed', {
+                            mode: 'sample',
+                            model_count: successfulResults.length,
+                            model_ids: successfulResults.map((r: SampleResultV2) => r.modelId),
+                            providers: [...new Set(successfulResults.map((r: SampleResultV2) => r.provider))],
+                        });
+                        if (selectedModels.length >= 2) {
+                            ph?.capture('comparison_made', {
+                                mode: 'sample',
+                                model_ids: selectedModels.map(m => m.id),
+                            });
+                        }
+                    }
                 }
             }
         } catch (e) {
