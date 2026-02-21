@@ -105,6 +105,15 @@ export default function PlaygroundPage() {
     const [maxBudget, setMaxBudget] = useState<number | null>(null);
 
     const resultsRef = useRef<HTMLDivElement>(null);
+    const [calcCount, setCalcCount] = useState(0);
+    const [ctaDismissed, setCtaDismissed] = useState(true); // start hidden, load from storage
+
+    useEffect(() => {
+        const count = parseInt(localStorage.getItem('trim_calc_count') ?? '0', 10);
+        const dismissed = localStorage.getItem('trim_pro_cta_dismissed') === 'true';
+        setCalcCount(count);
+        setCtaDismissed(dismissed);
+    }, []);
 
     const allModels = getAllModels();
     const visibleModels = mode === 'sample' ? allModels.filter(isSampleSupportedModel) : allModels;
@@ -241,6 +250,11 @@ export default function PlaygroundPage() {
                         estimates,
                         cheapest: typeof data.data.cheapest === 'string' ? data.data.cheapest : '',
                     });
+                    setCalcCount(prev => {
+                        const next = prev + 1;
+                        localStorage.setItem('trim_calc_count', String(next));
+                        return next;
+                    });
                     ph?.capture('calculation_completed', {
                         mode: 'estimate',
                         model_count: estimates.length,
@@ -281,6 +295,11 @@ export default function PlaygroundPage() {
                 const data = await response.json();
                 if (data.success && data.data) {
                     setSampleResult(data.data);
+                    setCalcCount(prev => {
+                        const next = prev + 1;
+                        localStorage.setItem('trim_calc_count', String(next));
+                        return next;
+                    });
                     const successfulResults = (data.data.results ?? []).filter(
                         (r: SampleResultV2) => r.actualUsage.inputTokens > 0 || r.actualUsage.outputTokens > 0
                     );
@@ -553,6 +572,34 @@ export default function PlaygroundPage() {
                                     className="w-[80px] bg-background border border-foreground/20 rounded px-2 py-1 text-foreground text-xs"
                                 />
                                 <span className="text-xs text-foreground/40">/req</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Pro CTA banner — appears after 3rd calculation */}
+                    {calcCount >= 3 && !ctaDismissed && (
+                        <div className="mb-4 flex items-center justify-between gap-4 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                            <div className="text-sm text-foreground/80">
+                                <span className="font-bold text-foreground">Unlock comparison history</span>
+                                {' — '}join the Pro waitlist and be first to know when it launches.
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <Link
+                                    href="/pro"
+                                    className="text-xs font-bold uppercase tracking-wider bg-red-500 text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                                >
+                                    Join Waitlist →
+                                </Link>
+                                <button
+                                    onClick={() => {
+                                        setCtaDismissed(true);
+                                        localStorage.setItem('trim_pro_cta_dismissed', 'true');
+                                    }}
+                                    className="text-foreground/30 hover:text-foreground/60 transition-colors text-lg leading-none"
+                                    aria-label="Dismiss"
+                                >
+                                    ×
+                                </button>
                             </div>
                         </div>
                     )}

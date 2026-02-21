@@ -15,15 +15,22 @@ interface StatRow {
     score: number;
 }
 
+interface WaitlistEntry {
+    email: string;
+    wtp: string | null;
+    createdAt: string;
+}
+
 async function getStats() {
     // ZRANGE ... REV WITHSCORES → sorted set, highest score first
-    const [modelsRaw, providersRaw, modesRaw, uniqueActivated, sharesTotal, uniqueSharers] = await Promise.all([
+    const [modelsRaw, providersRaw, modesRaw, uniqueActivated, sharesTotal, uniqueSharers, waitlistEntries] = await Promise.all([
         redis.zrange('stats:models', 0, -1, { rev: true, withScores: true }),
         redis.zrange('stats:providers', 0, -1, { rev: true, withScores: true }),
         redis.zrange('stats:modes', 0, -1, { rev: true, withScores: true }),
         redis.scard('stats:activated:users'),   // unique users who ran a calculation
         redis.get('stats:shares:total'),         // total share button clicks
         redis.scard('stats:shares:users'),       // unique users who shared
+        redis.lrange('waitlist:entries', 0, -1), // all waitlist entries
     ]);
 
     // Upstash returns flat array: [member, score, member, score, ...]
@@ -43,7 +50,21 @@ async function getStats() {
     const shares = Number(sharesTotal ?? 0);
     const shareRate = uniqueActivated > 0 ? ((uniqueSharers / uniqueActivated) * 100).toFixed(1) : '—';
 
-    return { models, providers, modes, total, uniqueActivated, shares, uniqueSharers, shareRate };
+    // Parse waitlist entries and compute WTP distribution
+    const parsedEntries: WaitlistEntry[] = (waitlistEntries as string[]).map(e => {
+        try { return JSON.parse(e) as WaitlistEntry; } catch { return null; }
+    }).filter(Boolean) as WaitlistEntry[];
+
+    const wtpCount: Record<string, number> = {};
+    for (const entry of parsedEntries) {
+        const key = entry.wtp ?? 'Not sure';
+        wtpCount[key] = (wtpCount[key] ?? 0) + 1;
+    }
+    const wtpDistribution = Object.entries(wtpCount)
+        .sort((a, b) => b[1] - a[1])
+        .map(([label, count]) => ({ label, count }));
+
+    return { models, providers, modes, total, uniqueActivated, shares, uniqueSharers, shareRate, waitlistCount: parsedEntries.length, wtpDistribution };
 }
 
 export default async function AdminPage() {
@@ -62,7 +83,7 @@ export default async function AdminPage() {
         );
     }
 
-    const { models, providers, modes, total, uniqueActivated, shares, shareRate } = await getStats();
+    const { models, providers, modes, total, uniqueActivated, shares, shareRate, waitlistCount, wtpDistribution } = await getStats();
     const maxModelScore = models[0]?.score ?? 1;
 
     return (
@@ -81,11 +102,28 @@ export default async function AdminPage() {
             <div className="max-w-[960px] mx-auto p-8 space-y-10">
 
                 {/* Summary row */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                     <StatBox label="Total Requests" value={total.toLocaleString()} />
                     <StatBox label="Unique Activated" value={uniqueActivated.toLocaleString()} sub="users ran ≥1 calculation" />
                     <StatBox label="Share Rate" value={`${shareRate}%`} sub={`${shares} shares total`} />
+                    <StatBox label="Waitlist" value={waitlistCount.toLocaleString()} sub="Pro signups" />
                 </div>
+
+                {/* Waitlist WTP distribution */}
+                {wtpDistribution.length > 0 && (
+                    <section>
+                        <h2 className="text-xs font-bold uppercase tracking-widest text-foreground/40 mb-4">Waitlist — WTP Distribution</h2>
+                        <div className="flex flex-wrap gap-3">
+                            {wtpDistribution.map(({ label, count }) => (
+                                <div key={label} className="bg-foreground/5 border border-foreground/10 rounded-lg px-4 py-3 min-w-[120px]">
+                                    <div className="text-xs text-foreground/50 mb-1">{label}</div>
+                                    <div className="text-xl font-bold tabular-nums">{count}</div>
+                                    <div className="text-xs text-foreground/30">{waitlistCount > 0 ? ((count / waitlistCount) * 100).toFixed(0) : 0}%</div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
 
                 {/* Mode split */}
                 <div className="grid grid-cols-2 gap-4">
