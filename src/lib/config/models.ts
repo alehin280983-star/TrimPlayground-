@@ -2341,9 +2341,25 @@ export const providers: ProviderConfig[] = [
     },
 ];
 
+// Official pricing page URLs per provider
+const PRICE_SOURCE_URLS: Record<string, string> = {
+    openai:    'https://openai.com/api/pricing',
+    anthropic: 'https://www.anthropic.com/pricing',
+    google:    'https://ai.google.dev/gemini-api/docs/pricing',
+    mistral:   'https://mistral.ai/technology/#pricing',
+    cohere:    'https://cohere.com/pricing',
+    deepseek:  'https://api-docs.deepseek.com/quick_start/pricing',
+    xai:       'https://x.ai/api',
+    alibaba:   'https://www.alibabacloud.com/help/en/model-studio/getting-started/models',
+    moonshot:  'https://platform.moonshot.cn/docs/pricing',
+    zhipu:     'https://bigmodel.cn/dev/howuse/model',
+};
+
 // Helper functions
 export function getAllModels(): ModelConfig[] {
-    return providers.flatMap(p => p.models);
+    return providers.flatMap(p =>
+        p.models.map(m => ({ ...m, priceSourceUrl: PRICE_SOURCE_URLS[m.provider] ?? undefined }))
+    );
 }
 
 export function getModelById(modelId: string): ModelConfig | undefined {

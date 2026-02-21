@@ -28,7 +28,7 @@ export default function ModelCard({ model, isFeatured }: ModelCardProps) {
 
             {/* Body */}
             <div className="p-[20px] bg-background flex-grow flex flex-col justify-center border-t border-foreground/10">
-                <div className="flex justify-between gap-2 border-b border-dashed border-foreground/10 pb-4 mb-4">
+                <div className="flex justify-between gap-2 border-b border-dashed border-foreground/10 pb-4 mb-4 relative">
                     {model.pricePerSecond ? (
                         <div className="w-full text-center">
                             <div className="text-[0.7rem] text-foreground/50 uppercase font-bold mb-1 tracking-wide">Cost</div>
@@ -61,11 +61,33 @@ export default function ModelCard({ model, isFeatured }: ModelCardProps) {
                 </div>
 
                 {/* Footer Info */}
-                <div className="text-center text-[0.75rem] text-foreground/60 font-medium pt-1">
-                    {model.maxTokens > 0
-                        ? `Context: ${(model.maxTokens / 1000).toFixed(0)}k`
-                        : (model.pricePerSecond ? 'Video Generation' : 'Image Generation')
-                    }
+                <div className="text-center text-[0.75rem] text-foreground/60 font-medium pt-1 flex items-center justify-center gap-1">
+                    <span>
+                        {model.maxTokens > 0
+                            ? `Context: ${(model.maxTokens / 1000).toFixed(0)}k`
+                            : (model.pricePerSecond ? 'Video Generation' : 'Image Generation')
+                        }
+                    </span>
+                    {/* Price source tooltip */}
+                    <span className="group relative inline-flex items-center">
+                        <span className="text-[0.65rem] text-foreground/30 cursor-default select-none">?</span>
+                        <span className="
+                            pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[200px]
+                            bg-foreground text-background text-[0.65rem] rounded px-2 py-1.5 leading-relaxed
+                            opacity-0 group-hover:opacity-100 transition-opacity z-10 text-center
+                        ">
+                            Verified {model.priceUpdatedAt.split('-').reverse().join('.')}
+                            {model.priceSourceUrl && (
+                                <> · <a
+                                    href={model.priceSourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline pointer-events-auto"
+                                    onClick={e => e.stopPropagation()}
+                                >source</a></>
+                            )}
+                        </span>
+                    </span>
                 </div>
             </div>
         </div>
