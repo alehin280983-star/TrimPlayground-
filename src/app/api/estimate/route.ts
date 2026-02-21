@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getModelById } from '@/lib/config';
 import { PriceRange, PriceEstimateV2 } from '@/types';
 import { redis } from '@/lib/rate-limit';
+import { auth } from '@clerk/nextjs/server';
 
 
 export const runtime = 'nodejs';
@@ -185,6 +186,8 @@ export async function POST(request: NextRequest) {
         });
 
         // Fire-and-forget stats — never block the response
+        const { userId } = await auth();
+        const activatorId = userId ?? `ip:${request.headers.get('x-forwarded-for') ?? 'unknown'}`;
         Promise.all([
             ...validModelIds.map(id => redis.zincrby('stats:models', 1, id)),
             ...validModelIds.map(id => {
@@ -192,6 +195,7 @@ export async function POST(request: NextRequest) {
                 return model ? redis.zincrby('stats:providers', 1, model.provider) : Promise.resolve(0);
             }),
             redis.zincrby('stats:modes', 1, 'estimate'),
+            redis.sadd('stats:activated:users', activatorId),
         ]).catch(() => {});
 
         return NextResponse.json({

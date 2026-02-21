@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { redis } from '@/lib/rate-limit';
+import { auth } from '@clerk/nextjs/server';
 
 const TTL_SECONDS = 90 * 86400; // 90 days
 
@@ -25,6 +26,14 @@ export async function POST(req: NextRequest) {
 
         const id = nanoid(10);
         await redis.set(`share:${id}`, JSON.stringify(payload), { ex: TTL_SECONDS });
+
+        // Fire-and-forget: count total shares + unique sharers
+        const { userId } = await auth();
+        const sharerId = userId ?? `ip:${req.headers.get('x-forwarded-for') ?? 'unknown'}`;
+        Promise.all([
+            redis.incr('stats:shares:total'),
+            redis.sadd('stats:shares:users', sharerId),
+        ]).catch(() => {});
 
         return NextResponse.json({ success: true, id });
     } catch {

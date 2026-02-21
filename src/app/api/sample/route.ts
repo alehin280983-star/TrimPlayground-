@@ -13,6 +13,7 @@ import { getModelById } from '@/lib/config/models';
 import { ProviderType, SampleResultV2 } from '@/types';
 import { BaseProvider } from '@/lib/providers/base';
 import { redis } from '@/lib/rate-limit';
+import { auth } from '@clerk/nextjs/server';
 
 
 export const runtime = 'nodejs';
@@ -287,6 +288,9 @@ export async function POST(request: NextRequest) {
             .filter(r => r.actualUsage.inputTokens > 0 || r.actualUsage.outputTokens > 0)
             .map(r => r.modelId);
 
+        const { userId } = await auth();
+        const activatorId = userId ?? `ip:${request.headers.get('x-forwarded-for') ?? 'unknown'}`;
+
         if (successfulIds.length > 0) {
             Promise.all([
                 ...successfulIds.map(id => redis.zincrby('stats:models', 1, id)),
@@ -295,6 +299,7 @@ export async function POST(request: NextRequest) {
                     return model ? redis.zincrby('stats:providers', 1, model.provider) : Promise.resolve(0);
                 }),
                 redis.zincrby('stats:modes', 1, 'sample'),
+                redis.sadd('stats:activated:users', activatorId),
             ]).catch(() => {});
         }
 

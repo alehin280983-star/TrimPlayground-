@@ -17,10 +17,13 @@ interface StatRow {
 
 async function getStats() {
     // ZRANGE ... REV WITHSCORES → sorted set, highest score first
-    const [modelsRaw, providersRaw, modesRaw] = await Promise.all([
+    const [modelsRaw, providersRaw, modesRaw, uniqueActivated, sharesTotal, uniqueSharers] = await Promise.all([
         redis.zrange('stats:models', 0, -1, { rev: true, withScores: true }),
         redis.zrange('stats:providers', 0, -1, { rev: true, withScores: true }),
         redis.zrange('stats:modes', 0, -1, { rev: true, withScores: true }),
+        redis.scard('stats:activated:users'),   // unique users who ran a calculation
+        redis.get('stats:shares:total'),         // total share button clicks
+        redis.scard('stats:shares:users'),       // unique users who shared
     ]);
 
     // Upstash returns flat array: [member, score, member, score, ...]
@@ -37,8 +40,10 @@ async function getStats() {
     const modes = parse(modesRaw as (string | number)[]);
 
     const total = modes.reduce((sum, m) => sum + m.score, 0);
+    const shares = Number(sharesTotal ?? 0);
+    const shareRate = uniqueActivated > 0 ? ((uniqueSharers / uniqueActivated) * 100).toFixed(1) : '—';
 
-    return { models, providers, modes, total };
+    return { models, providers, modes, total, uniqueActivated, shares, uniqueSharers, shareRate };
 }
 
 export default async function AdminPage() {
@@ -57,7 +62,7 @@ export default async function AdminPage() {
         );
     }
 
-    const { models, providers, modes, total } = await getStats();
+    const { models, providers, modes, total, uniqueActivated, shares, shareRate } = await getStats();
     const maxModelScore = models[0]?.score ?? 1;
 
     return (
@@ -78,6 +83,12 @@ export default async function AdminPage() {
                 {/* Summary row */}
                 <div className="grid grid-cols-3 gap-4">
                     <StatBox label="Total Requests" value={total.toLocaleString()} />
+                    <StatBox label="Unique Activated" value={uniqueActivated.toLocaleString()} sub="users ran ≥1 calculation" />
+                    <StatBox label="Share Rate" value={`${shareRate}%`} sub={`${shares} shares total`} />
+                </div>
+
+                {/* Mode split */}
+                <div className="grid grid-cols-2 gap-4">
                     <StatBox label="Estimate" value={`${modes.find(m => m.member === 'estimate')?.score.toLocaleString() ?? 0}`} sub="requests" />
                     <StatBox label="Sample" value={`${modes.find(m => m.member === 'sample')?.score.toLocaleString() ?? 0}`} sub="requests" />
                 </div>
