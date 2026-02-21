@@ -69,16 +69,12 @@ async function getStats() {
 
 export default async function AdminPage() {
     if (!(await isAdmin())) {
-        const { userId } = await auth();
         return (
             <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
                 <div className="text-center">
                     <div className="text-4xl mb-4">🔒</div>
                     <h1 className="text-xl font-bold mb-2">Access Denied</h1>
                     <p className="text-foreground/50 text-sm mb-4">Admin only</p>
-                    {userId && (
-                        <p className="text-foreground/30 text-xs mb-4 font-mono">your id: {userId}</p>
-                    )}
                     <Link href="/playground" className="text-sm underline text-foreground/50 hover:text-foreground">
                         Go to Playground
                     </Link>
