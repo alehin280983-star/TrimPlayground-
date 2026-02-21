@@ -12,6 +12,7 @@ import { ZhipuProvider } from '@/lib/providers/zhipu';
 import { getModelById } from '@/lib/config/models';
 import { ProviderType, SampleResultV2 } from '@/types';
 import { BaseProvider } from '@/lib/providers/base';
+import { redis } from '@/lib/rate-limit';
 
 
 export const runtime = 'nodejs';
@@ -279,6 +280,22 @@ export async function POST(request: NextRequest) {
                     latencyMs: 0,
                 });
             }
+        }
+
+        // Fire-and-forget stats — only successful results (actualUsage > 0)
+        const successfulIds = results
+            .filter(r => r.actualUsage.inputTokens > 0 || r.actualUsage.outputTokens > 0)
+            .map(r => r.modelId);
+
+        if (successfulIds.length > 0) {
+            Promise.all([
+                ...successfulIds.map(id => redis.zincrby('stats:models', 1, id)),
+                ...successfulIds.map(id => {
+                    const model = getModelById(id);
+                    return model ? redis.zincrby('stats:providers', 1, model.provider) : Promise.resolve(0);
+                }),
+                redis.zincrby('stats:modes', 1, 'sample'),
+            ]).catch(() => {});
         }
 
         return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getModelById } from '@/lib/config';
 import { PriceRange, PriceEstimateV2 } from '@/types';
+import { redis } from '@/lib/rate-limit';
 
 
 export const runtime = 'nodejs';
@@ -171,6 +172,7 @@ export async function POST(request: NextRequest) {
 
         // Calculate totals and find cheapest
         const validEstimates = estimates.filter(e => !('error' in e)) as PriceEstimateV2[];
+        const validModelIds = validEstimates.map(e => e.modelId);
 
         let cheapest = '';
         let lowestMedian = Infinity;
@@ -181,6 +183,16 @@ export async function POST(request: NextRequest) {
                 cheapest = est.modelId;
             }
         });
+
+        // Fire-and-forget stats — never block the response
+        Promise.all([
+            ...validModelIds.map(id => redis.zincrby('stats:models', 1, id)),
+            ...validModelIds.map(id => {
+                const model = getModelById(id);
+                return model ? redis.zincrby('stats:providers', 1, model.provider) : Promise.resolve(0);
+            }),
+            redis.zincrby('stats:modes', 1, 'estimate'),
+        ]).catch(() => {});
 
         return NextResponse.json({
             success: true,
