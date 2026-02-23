@@ -2204,8 +2204,8 @@ const zhipuModels: ModelConfig[] = [
         id: 'glm-5',
         name: 'GLM-5',
         provider: 'zhipu',
-        inputPrice: 0.00055, // $0.55 / 1M (¥4 / 1M, base tier ≤32K ctx)
-        outputPrice: 0.00248, // $2.48 / 1M (¥18 / 1M)
+        inputPrice: 0.000579, // $0.58 / 1M (¥4 / 1M, base tier ≤32K ctx, rate 6.91)
+        outputPrice: 0.002605, // $2.60 / 1M (¥18 / 1M)
         maxTokens: 200000,
         maxOutputTokens: 8192,
         freeTierAvailable: false,
@@ -2218,8 +2218,8 @@ const zhipuModels: ModelConfig[] = [
         id: 'glm-4.7',
         name: 'GLM-4.7',
         provider: 'zhipu',
-        inputPrice: 0.000276, // $0.28 / 1M (¥2 / 1M, base tier ≤32K ctx)
-        outputPrice: 0.0011, // $1.10 / 1M (¥8 / 1M)
+        inputPrice: 0.000289, // $0.29 / 1M (¥2 / 1M, base tier ≤32K ctx, rate 6.91)
+        outputPrice: 0.001158, // $1.16 / 1M (¥8 / 1M)
         maxTokens: 128000,
         maxOutputTokens: 8192,
         freeTierAvailable: false,
