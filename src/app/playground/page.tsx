@@ -10,6 +10,7 @@ import { ModelConfig, SampleResultV2, PriceEstimateV2, CalculationMode, Provider
 import { getAllModels } from '@/lib/config';
 import { recomputeEstimate, sortEstimates, findCheapest, EnrichedEstimate } from '@/lib/estimate-calculator';
 import { PlaygroundExportButtons } from '@/components/playground/PlaygroundExportButtons';
+import { ExitIntentPopup } from '@/components/playground/ExitIntentPopup';
 
 type ModelCategory = 'text_code' | 'image' | 'audio' | 'video' | 'embedding';
 
@@ -327,6 +328,7 @@ export default function PlaygroundPage() {
     };
 
     return (
+        <>
         <div className="min-h-screen bg-background font-sans text-foreground">
             <Header />
 
@@ -585,7 +587,7 @@ export default function PlaygroundPage() {
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                                 <Link
-                                    href="/pro"
+                                    href="/pro?utm_source=playground&utm_medium=cta_banner"
                                     className="text-xs font-bold uppercase tracking-wider bg-red-500 text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
                                 >
                                     Join Waitlist →
@@ -645,7 +647,11 @@ export default function PlaygroundPage() {
                     </div>
 
                 </div>
+
             </div>
         </div>
+
+        <ExitIntentPopup hasCalculated={!!(enrichedEstimates || sampleResult)} />
+        </>
     );
 }
