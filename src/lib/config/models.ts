@@ -2204,13 +2204,13 @@ const zhipuModels: ModelConfig[] = [
         id: 'glm-5',
         name: 'GLM-5',
         provider: 'zhipu',
-        inputPrice: 0.001, // $1.00 / 1M
-        outputPrice: 0.0032, // $3.20 / 1M
+        inputPrice: 0.00055, // $0.55 / 1M (¥4 / 1M, base tier ≤32K ctx)
+        outputPrice: 0.00248, // $2.48 / 1M (¥18 / 1M)
         maxTokens: 200000,
         maxOutputTokens: 8192,
         freeTierAvailable: false,
         description: '744B MoE flagship model trained on Huawei Ascend chips',
-        priceUpdatedAt: '2026-02-20',
+        priceUpdatedAt: '2026-02-23',
         speedRating: 3,
         qualityRating: 5,
     },
@@ -2218,13 +2218,13 @@ const zhipuModels: ModelConfig[] = [
         id: 'glm-4.7',
         name: 'GLM-4.7',
         provider: 'zhipu',
-        inputPrice: 0.0006, // $0.60 / 1M
-        outputPrice: 0.0022, // $2.20 / 1M
+        inputPrice: 0.000276, // $0.28 / 1M (¥2 / 1M, base tier ≤32K ctx)
+        outputPrice: 0.0011, // $1.10 / 1M (¥8 / 1M)
         maxTokens: 128000,
         maxOutputTokens: 8192,
         freeTierAvailable: false,
         description: 'High-performance general-purpose model',
-        priceUpdatedAt: '2026-02-20',
+        priceUpdatedAt: '2026-02-23',
         speedRating: 4,
         qualityRating: 4,
     },
