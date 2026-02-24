@@ -77,6 +77,9 @@ export default function ModelCard({ model, isFeatured }: ModelCardProps) {
                             opacity-0 group-hover:opacity-100 transition-opacity z-10 text-center
                         ">
                             Verified {model.priceUpdatedAt.split('-').reverse().join('.')}
+                            {model.priceConversionRate && (
+                                <> · ¥→$ at {model.priceConversionRate} CNY/USD</>
+                            )}
                             {model.priceSourceUrl && (
                                 <> · <a
                                     href={model.priceSourceUrl}

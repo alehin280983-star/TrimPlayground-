@@ -16,6 +16,7 @@ export interface ModelConfig {
   description: string;
   priceUpdatedAt: string;          // ISO date, e.g. '2026-02-20'
   priceSourceUrl?: string;         // Official pricing page URL
+  priceConversionRate?: number;    // e.g. 6.91 = converted from CNY at 6.91 CNY/USD
   speedRating: 1 | 2 | 3 | 4 | 5; // 1=slowest, 5=fastest
   qualityRating: 1 | 2 | 3 | 4 | 5;
   modality?: 'text' | 'image' | 'video' | 'audio' | 'embedding'; // Default: 'text'
