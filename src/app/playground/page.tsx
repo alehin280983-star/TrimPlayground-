@@ -359,6 +359,13 @@ export default function PlaygroundPage() {
                                 const modelCount = Object.values(categories).reduce((sum, arr) => sum + arr.length, 0);
                                 const selectedCount = visibleModels.filter(m => m.provider === provider && selectedModels.find(s => s.id === m.id)).length;
 
+                                const allProviderModels = Object.values(categories).flat();
+                                const providerUpdatedAt = allProviderModels.reduce((latest, m) =>
+                                    m.priceUpdatedAt > latest ? m.priceUpdatedAt : latest, '');
+                                const providerDateShort = providerUpdatedAt
+                                    ? providerUpdatedAt.split('-').reverse().join('.')
+                                    : '';
+
                                 return (
                                     <div key={provider} className="mb-1">
                                         <button
@@ -368,16 +375,19 @@ export default function PlaygroundPage() {
                                             <span className="text-[0.82rem] font-bold text-foreground/80">
                                                 {isExpanded ? '▼' : '▶'} {PROVIDER_LABELS[provider]}
                                             </span>
-                                            <span className="text-[0.65rem] text-foreground/40">
-                                                {selectedCount > 0 && <span className="text-foreground font-bold mr-1">{selectedCount}/</span>}
-                                                {modelCount}
+                                            <span className="flex items-center gap-2 text-[0.65rem] text-foreground/40">
+                                                {providerDateShort && <span>{providerDateShort}</span>}
+                                                <span>
+                                                    {selectedCount > 0 && <span className="text-foreground font-bold mr-1">{selectedCount}/</span>}
+                                                    {modelCount}
+                                                </span>
                                             </span>
                                         </button>
                                         {isExpanded && (
                                             <div className="pl-3 pb-2">
                                                 {/* Price column header */}
                                                 <div className="flex items-center gap-4 px-2 py-0.5 mb-1 text-[0.7rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
-                                                    <span>Model / Updated</span>
+                                                    <span>Model</span>
                                                     <span className="flex items-center gap-1.5 font-mono">
                                                         <span>In/1M</span>
                                                         <span>·</span>
@@ -409,9 +419,6 @@ export default function PlaygroundPage() {
                                                                     `}
                                                                 >
                                                                     <span className="text-[0.9rem]">{model.name}</span>
-                                                                    <span className="text-[0.8rem] text-foreground/30">
-                                                                        — {model.priceUpdatedAt.split('-').reverse().join('.')}
-                                                                    </span>
                                                                     <span className="flex items-center gap-1.5 text-[0.8rem] font-mono text-foreground/40 pl-2">
                                                                         <span title="Input price per 1M tokens">{fmtPrice(model.inputPrice)}</span>
                                                                         <span className="text-foreground/20">·</span>
