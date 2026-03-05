@@ -344,10 +344,10 @@ export default function PlaygroundPage() {
         <div className="min-h-screen bg-background font-sans text-foreground">
             <Header />
 
-            <div className="flex p-10 gap-10 max-w-[1400px] mx-auto box-border h-[calc(100vh-60px)]">
+            <div className="flex py-10 pr-10 pl-2 gap-10 max-w-[1400px] mx-auto box-border h-[calc(100vh-60px)]">
 
                 {/* LEFT COLUMN - Static provider list */}
-                <div className={`shrink-0 flex flex-col h-full transition-all duration-200 ${expandedProvider !== null ? 'min-w-[420px]' : ''}`}>
+                <div className={`shrink-0 flex flex-col h-full transition-all duration-200 ${expandedProvider !== null ? 'min-w-[500px]' : ''}`}>
                     <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
                         <div className="bg-foreground text-background px-4 py-3 font-bold uppercase text-sm text-center">
                             Models
@@ -376,7 +376,7 @@ export default function PlaygroundPage() {
                                         {isExpanded && (
                                             <div className="pl-3 pb-2">
                                                 {/* Price column header */}
-                                                <div className="flex items-center px-2 py-0.5 mb-1 text-[0.55rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
+                                                <div className="flex items-center px-2 py-0.5 mb-1 text-[0.7rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
                                                     <span className="flex-1">Model / Updated</span>
                                                     <span className="flex items-center gap-1.5 font-mono ml-4">
                                                         <span>In/1M</span>
@@ -408,11 +408,11 @@ export default function PlaygroundPage() {
                                                                             : 'text-foreground/60 hover:text-foreground hover:bg-foreground/5'}
                                                                     `}
                                                                 >
-                                                                    <span className="text-[0.8rem]">{model.name}</span>
-                                                                    <span className="text-[0.6rem] text-foreground/30">
+                                                                    <span className="text-[0.9rem]">{model.name}</span>
+                                                                    <span className="text-[0.8rem] text-foreground/30">
                                                                         — {model.priceUpdatedAt.split('-').reverse().join('.')}
                                                                     </span>
-                                                                    <span className="ml-auto flex items-center gap-1.5 text-[0.6rem] font-mono text-foreground/40 pl-3">
+                                                                    <span className="ml-auto flex items-center gap-1.5 text-[0.8rem] font-mono text-foreground/40 pl-3">
                                                                         <span title="Input price per 1M tokens">{fmtPrice(model.inputPrice)}</span>
                                                                         <span className="text-foreground/20">·</span>
                                                                         <span title="Cached input price per 1M tokens">{fmtPrice(model.cachedInputPrice)}</span>
