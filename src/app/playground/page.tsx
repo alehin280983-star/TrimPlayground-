@@ -347,9 +347,9 @@ export default function PlaygroundPage() {
             <div className="flex h-[calc(100vh-60px)] gap-6">
 
                 {/* LEFT COLUMN - Static provider list */}
-                <div className={`shrink-0 flex flex-col h-full py-10 pl-2 transition-all duration-200 ${expandedProvider !== null ? 'min-w-[500px]' : ''}`}>
+                <div className="shrink-0 flex flex-col h-full py-10 pl-2 min-w-[500px]">
                     <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
-                        <div className="bg-foreground text-background px-4 py-3 font-bold uppercase text-sm text-center">
+                        <div className="bg-foreground text-background px-4 py-3 font-bold uppercase text-sm text-left">
                             Models
                         </div>
                         <div className="px-3 py-2 overflow-y-auto h-full">
@@ -376,9 +376,9 @@ export default function PlaygroundPage() {
                                         {isExpanded && (
                                             <div className="pl-3 pb-2">
                                                 {/* Price column header */}
-                                                <div className="flex items-center px-2 py-0.5 mb-1 text-[0.7rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
-                                                    <span className="flex-1">Model / Updated</span>
-                                                    <span className="flex items-center gap-1.5 font-mono ml-4">
+                                                <div className="flex items-center gap-4 px-2 py-0.5 mb-1 text-[0.7rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
+                                                    <span>Model / Updated</span>
+                                                    <span className="flex items-center gap-1.5 font-mono">
                                                         <span>In/1M</span>
                                                         <span>·</span>
                                                         <span>Cache/1M</span>
@@ -412,7 +412,7 @@ export default function PlaygroundPage() {
                                                                     <span className="text-[0.8rem] text-foreground/30">
                                                                         — {model.priceUpdatedAt.split('-').reverse().join('.')}
                                                                     </span>
-                                                                    <span className="ml-auto flex items-center gap-1.5 text-[0.8rem] font-mono text-foreground/40 pl-3">
+                                                                    <span className="flex items-center gap-1.5 text-[0.8rem] font-mono text-foreground/40 pl-2">
                                                                         <span title="Input price per 1M tokens">{fmtPrice(model.inputPrice)}</span>
                                                                         <span className="text-foreground/20">·</span>
                                                                         <span title="Cached input price per 1M tokens">{fmtPrice(model.cachedInputPrice)}</span>
