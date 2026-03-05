@@ -344,10 +344,10 @@ export default function PlaygroundPage() {
         <div className="min-h-screen bg-background font-sans text-foreground">
             <Header />
 
-            <div className="flex py-10 pr-10 pl-2 gap-10 max-w-[1400px] mx-auto box-border h-[calc(100vh-60px)]">
+            <div className="flex h-[calc(100vh-60px)] gap-6">
 
                 {/* LEFT COLUMN - Static provider list */}
-                <div className={`shrink-0 flex flex-col h-full transition-all duration-200 ${expandedProvider !== null ? 'min-w-[500px]' : ''}`}>
+                <div className={`shrink-0 flex flex-col h-full py-10 pl-2 transition-all duration-200 ${expandedProvider !== null ? 'min-w-[500px]' : ''}`}>
                     <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
                         <div className="bg-foreground text-background px-4 py-3 font-bold uppercase text-sm text-center">
                             Models
@@ -434,7 +434,7 @@ export default function PlaygroundPage() {
                 </div>
 
                 {/* RIGHT COLUMN */}
-                <div className="flex-1 min-w-0 flex flex-col">
+                <div className="flex-1 min-w-0 flex flex-col py-10 pr-10 max-w-[960px]">
 
                     {/* Selected Tags */}
                     <div className="text-[0.8rem] text-foreground mb-[10px] font-bold flex gap-[10px] min-h-[24px]">
