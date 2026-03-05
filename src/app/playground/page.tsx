@@ -646,7 +646,7 @@ export default function PlaygroundPage() {
                     )}
 
                     {/* Cards Container */}
-                    <div ref={resultsRef} className="flex justify-between gap-[20px] mt-[10px]">
+                    <div ref={resultsRef} className="flex gap-[20px] mt-[10px] overflow-x-auto pb-2">
                         {/* Estimate mode: show estimate cards */}
                         {mode === 'estimate' && enrichedEstimates && enrichedEstimates.estimates.length > 0 ? (
                             enrichedEstimates.estimates.map((estimate) => (

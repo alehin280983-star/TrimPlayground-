@@ -52,7 +52,7 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
 
     return (
         <div className={`
-            flex-1 flex flex-col shadow-sm rounded-lg overflow-hidden bg-background border transition-transform duration-300 hover:-translate-y-1
+            flex-1 min-w-[220px] flex flex-col shadow-sm rounded-lg overflow-hidden bg-background border transition-transform duration-300 hover:-translate-y-1
             ${isCheapest ? 'border-green-500 ring-2 ring-green-500/20' : 'border-foreground/10'}
         `}>
             {/* Header */}
