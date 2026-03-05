@@ -6,14 +6,33 @@ import PostHogProvider from "@/components/analytics/PostHogProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Trim Playground",
-  description: "Compare AI model costs in real-time. Understand your AI economics in 5 minutes without reading documentation.",
-  keywords: ["AI", "cost comparison", "GPT-4", "Claude", "Gemini", "pricing", "LLM"],
-  authors: [{ name: "AI Cost Platform" }],
+  metadataBase: new URL('https://trimplayground.com'),
+  title: {
+    default: "Trim Playground — Compare AI Model Costs",
+    template: "%s | Trim Playground",
+  },
+  description: "Compare costs across 140+ AI models: GPT-4, Claude, Gemini, DeepSeek and more. See exact pricing per request and monthly spend — without reading documentation.",
+  keywords: ["AI cost comparison", "LLM pricing", "GPT-4 cost", "Claude pricing", "Gemini cost", "AI model comparison", "AI API pricing calculator"],
+  authors: [{ name: "Trim Playground" }],
   openGraph: {
-    title: "Trim Playground",
-    description: "Compare AI model costs in real-time",
+    title: "Trim Playground — Compare AI Model Costs",
+    description: "Compare costs across 140+ AI models in real-time. Make informed decisions and optimize your AI spending.",
+    url: "https://trimplayground.com",
+    siteName: "Trim Playground",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Trim Playground — Compare AI Model Costs",
+    description: "Compare costs across 140+ AI models: GPT-4, Claude, Gemini and more.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  verification: {
+    google: '6jlR9WtCVDDnq1UMQgkfgKy9t1gS5nAuiR24BMMVG0o',
   },
 };
 

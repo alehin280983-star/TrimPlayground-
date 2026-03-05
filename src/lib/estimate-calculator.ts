@@ -1,12 +1,26 @@
 import { PriceEstimateV2, PriceRange, OutputInputRatio, PriorityMode, ModelConfig } from '@/types';
 import { formatCost, formatTokens } from '@/lib/tokens';
 
+export type FormulaPart =
+    | { type: 'text'; text: string }
+    | { type: 'price'; text: string; updatedAt: string };
+
+export type FormulaStep = FormulaPart[];
+
 export interface EnrichedEstimate extends PriceEstimateV2 {
     monthlyCost: PriceRange;
     modelConfig: ModelConfig;
-    formulaSteps: string[];
+    formulaSteps: FormulaStep[];
     supportsCaching: boolean;
     supportsBatch: boolean;
+}
+
+function step(...parts: Array<string | { price: number; updatedAt: string }>): FormulaStep {
+    return parts.map(p =>
+        typeof p === 'string'
+            ? { type: 'text' as const, text: p }
+            : { type: 'price' as const, text: `$${p.price}/1K`, updatedAt: p.updatedAt }
+    );
 }
 
 interface RecomputeOptions {
@@ -44,9 +58,10 @@ export function recomputeEstimate(
 
     // Input cost (with optional caching)
     let inputCost: number;
-    const formulaSteps: string[] = [];
+    const formulaSteps: FormulaStep[] = [];
     const supportsCaching = !!model.cachedInputPrice;
     const supportsBatch = !!model.batchDiscount;
+    const at = model.priceUpdatedAt;
 
     if (opts.cachingEnabled && supportsCaching) {
         const hitRate = opts.cacheHitRate / 100;
@@ -54,13 +69,13 @@ export function recomputeEstimate(
         const uncachedCost = (inputTokens * (1 - hitRate) / 1000) * model.inputPrice;
         inputCost = cachedCost + uncachedCost;
         formulaSteps.push(
-            `Input (cached ${opts.cacheHitRate}%): ${formatTokens(inputTokens)} tokens × ${hitRate * 100}% × $${model.cachedInputPrice!}/1K = ${formatCost(cachedCost)}`,
-            `Input (uncached ${100 - opts.cacheHitRate}%): ${formatTokens(inputTokens)} tokens × ${(1 - hitRate) * 100}% × $${model.inputPrice}/1K = ${formatCost(uncachedCost)}`
+            step(`Input (cached ${opts.cacheHitRate}%): ${formatTokens(inputTokens)} tokens × ${hitRate * 100}% × `, { price: model.cachedInputPrice!, updatedAt: at }, ` = ${formatCost(cachedCost)}`),
+            step(`Input (uncached ${100 - opts.cacheHitRate}%): ${formatTokens(inputTokens)} tokens × ${(1 - hitRate) * 100}% × `, { price: model.inputPrice, updatedAt: at }, ` = ${formatCost(uncachedCost)}`)
         );
     } else {
         inputCost = (inputTokens / 1000) * model.inputPrice;
         formulaSteps.push(
-            `Input: ${formatTokens(inputTokens)} tokens × $${model.inputPrice}/1K = ${formatCost(inputCost)}`
+            step(`Input: ${formatTokens(inputTokens)} tokens × `, { price: model.inputPrice, updatedAt: at }, ` = ${formatCost(inputCost)}`)
         );
     }
 
@@ -72,7 +87,7 @@ export function recomputeEstimate(
     };
 
     formulaSteps.push(
-        `Output: ${formatTokens(outputTokens)} tokens × $${model.outputPrice}/1K = ${formatCost(outputCostRange.median)}`
+        step(`Output: ${formatTokens(outputTokens)} tokens × `, { price: model.outputPrice, updatedAt: at }, ` = ${formatCost(outputCostRange.median)}`)
     );
 
     // Per-request total
@@ -83,7 +98,7 @@ export function recomputeEstimate(
     };
 
     formulaSteps.push(
-        `Per request: ${formatCost(inputCost)} + ${formatCost(outputCostRange.median)} = ${formatCost(perRequest.median)}`
+        step(`Per request: ${formatCost(inputCost)} + ${formatCost(outputCostRange.median)} = ${formatCost(perRequest.median)}`)
     );
 
     // Monthly cost
@@ -94,7 +109,7 @@ export function recomputeEstimate(
     };
 
     formulaSteps.push(
-        `Monthly: ${opts.requestsPerMonth.toLocaleString()} requests × ${formatCost(perRequest.median)} = ${formatCost(monthlyCost.median)}`
+        step(`Monthly: ${opts.requestsPerMonth.toLocaleString()} requests × ${formatCost(perRequest.median)} = ${formatCost(monthlyCost.median)}`)
     );
 
     // Batch discount
@@ -106,7 +121,7 @@ export function recomputeEstimate(
             max: monthlyCost.max * (1 - discount),
         };
         formulaSteps.push(
-            `Batch API (${discount * 100}% off): ${formatCost(monthlyCost.median)}/mo`
+            step(`Batch API (${discount * 100}% off): ${formatCost(monthlyCost.median)}/mo`)
         );
     }
 

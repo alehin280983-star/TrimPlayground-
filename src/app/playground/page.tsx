@@ -50,6 +50,14 @@ const SAMPLE_SUPPORTED_MODALITIES: Record<ProviderType, Array<'text' | 'image' |
     zhipu: ['text'],
 };
 
+function fmtPrice(p: number | undefined): string {
+    if (!p) return '—';
+    const per1M = p * 1000;
+    if (per1M >= 1) return `$${per1M.toFixed(2)}`;
+    if (per1M >= 0.1) return `$${per1M.toFixed(3)}`;
+    return `$${per1M.toFixed(4)}`;
+}
+
 function getModelCategory(model: ModelConfig): ModelCategory {
     if (model.modality === 'image') return 'image';
     if (model.modality === 'audio') return 'audio';
@@ -115,6 +123,10 @@ export default function PlaygroundPage() {
         setCalcCount(count);
         setCtaDismissed(dismissed);
     }, []);
+
+    useEffect(() => {
+        ph?.capture('playground_viewed', { is_signed_in: isSignedIn ?? false });
+    }, [ph, isSignedIn]);
 
     const allModels = getAllModels();
     const visibleModels = mode === 'sample' ? allModels.filter(isSampleSupportedModel) : allModels;
@@ -213,7 +225,7 @@ export default function PlaygroundPage() {
             if (prev.find(m => m.id === model.id)) {
                 return prev.filter(m => m.id !== model.id);
             }
-            if (prev.length >= 3) return prev; // Limit to 3 for the design
+            if (prev.length >= 5) return prev;
             return [...prev, model];
         });
     };
@@ -335,7 +347,7 @@ export default function PlaygroundPage() {
             <div className="flex p-10 gap-10 max-w-[1400px] mx-auto box-border h-[calc(100vh-60px)]">
 
                 {/* LEFT COLUMN - Static provider list */}
-                <div className="shrink-0 flex flex-col h-full">
+                <div className={`shrink-0 flex flex-col h-full transition-all duration-200 ${expandedProvider !== null ? 'min-w-[420px]' : ''}`}>
                     <div className="flex-grow bg-background border border-foreground/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
                         <div className="bg-foreground text-background px-4 py-3 font-bold uppercase text-sm text-center">
                             Models
@@ -363,6 +375,17 @@ export default function PlaygroundPage() {
                                         </button>
                                         {isExpanded && (
                                             <div className="pl-3 pb-2">
+                                                {/* Price column header */}
+                                                <div className="flex items-center px-2 py-0.5 mb-1 text-[0.55rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
+                                                    <span className="flex-1">Model / Updated</span>
+                                                    <span className="flex items-center gap-1.5 font-mono ml-4">
+                                                        <span>In/1M</span>
+                                                        <span>·</span>
+                                                        <span>Cache/1M</span>
+                                                        <span>·</span>
+                                                        <span>Out/1M</span>
+                                                    </span>
+                                                </div>
                                                 {CATEGORY_ORDER.map((category) => {
                                                     const models = categories[category];
                                                     if (!models || models.length === 0) return null;
@@ -379,15 +402,22 @@ export default function PlaygroundPage() {
                                                                     key={model.id}
                                                                     onClick={() => handleModelToggle(model)}
                                                                     className={`
-                                                                        text-[0.8rem] py-1 px-2 rounded cursor-pointer transition-colors whitespace-nowrap
+                                                                        flex items-center gap-2 py-1 px-2 rounded cursor-pointer transition-colors whitespace-nowrap
                                                                         ${selectedModels.find(m => m.id === model.id)
                                                                             ? 'font-bold text-foreground bg-foreground/10'
                                                                             : 'text-foreground/60 hover:text-foreground hover:bg-foreground/5'}
                                                                     `}
                                                                 >
-                                                                    {model.name}
-                                                                    <span className="text-[0.6rem] text-foreground/30 ml-1">
+                                                                    <span className="text-[0.8rem]">{model.name}</span>
+                                                                    <span className="text-[0.6rem] text-foreground/30">
                                                                         — {model.priceUpdatedAt.split('-').reverse().join('.')}
+                                                                    </span>
+                                                                    <span className="ml-auto flex items-center gap-1.5 text-[0.6rem] font-mono text-foreground/40 pl-3">
+                                                                        <span title="Input price per 1M tokens">{fmtPrice(model.inputPrice)}</span>
+                                                                        <span className="text-foreground/20">·</span>
+                                                                        <span title="Cached input price per 1M tokens">{fmtPrice(model.cachedInputPrice)}</span>
+                                                                        <span className="text-foreground/20">·</span>
+                                                                        <span title="Output price per 1M tokens">{fmtPrice(model.outputPrice)}</span>
                                                                     </span>
                                                                 </div>
                                                             ))}
@@ -429,7 +459,10 @@ export default function PlaygroundPage() {
 
                     {/* Mode Toggle + Requests/Month */}
                     <div className="mb-4 flex items-center gap-4">
-                        <ModeToggle value={mode} onChange={setMode} />
+                        <ModeToggle value={mode} onChange={(newMode) => {
+                            ph?.capture('mode_switched', { from: mode, to: newMode });
+                            setMode(newMode);
+                        }} />
                         <div className="flex items-center gap-2 text-sm">
                             <label htmlFor="requests-per-month" className="text-foreground/60 whitespace-nowrap">
                                 Requests/month:
@@ -440,6 +473,7 @@ export default function PlaygroundPage() {
                                 min={1}
                                 value={requestsPerMonth}
                                 onChange={(e) => setRequestsPerMonth(Math.max(1, parseInt(e.target.value) || 1))}
+                                onBlur={(e) => ph?.capture('requests_month_filled', { value: parseInt(e.target.value) || 1 })}
                                 className="w-[100px] bg-background border border-foreground/20 rounded px-2 py-1 text-foreground text-sm"
                             />
                         </div>
@@ -450,7 +484,12 @@ export default function PlaygroundPage() {
                         <div className="mb-4 space-y-2">
                             {/* Level 2: Refine calculation */}
                             <button
-                                onClick={() => setRefineOpen(prev => !prev)}
+                                onClick={() => {
+                                    setRefineOpen(prev => {
+                                        if (!prev) ph?.capture('refine_opened');
+                                        return !prev;
+                                    });
+                                }}
                                 className="text-[0.8rem] text-foreground/50 hover:text-foreground/80 transition-colors"
                             >
                                 {refineOpen ? '▼' : '▶'} Refine calculation

@@ -16,19 +16,19 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --background: #F4F3EE;
+    --background: #ffffff;
     --foreground: #41413e;
     --accent: #41413e;
-    --card: #F4F3EE;
+    --card: #ffffff;
   }
 }
 
 /* Allow explicit light class override */
 :root.light {
-  --background: #F4F3EE;
+  --background: #ffffff;
   --foreground: #41413e;
   --accent: #41413e;
-  --card: #F4F3EE;
+  --card: #ffffff;
 }
 
 /* Explicit dark class override */

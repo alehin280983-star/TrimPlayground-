@@ -41,6 +41,15 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
         }
     };
 
+    const getPriceStaleness = (priceUpdatedAt: string) => {
+        const days = Math.floor((Date.now() - new Date(priceUpdatedAt).getTime()) / 86_400_000);
+        if (days < 7) return null;
+        if (days < 30) return { days, color: 'text-orange-300', label: `Prices updated ${days}d ago` };
+        return { days, color: 'text-red-300', label: `Prices updated ${days}d ago` };
+    };
+
+    const staleness = enriched ? getPriceStaleness(enriched.modelConfig.priceUpdatedAt) : null;
+
     return (
         <div className={`
             flex-1 flex flex-col shadow-sm rounded-lg overflow-hidden bg-background border transition-transform duration-300 hover:-translate-y-1
@@ -57,6 +66,11 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
                 <div className="text-[0.7rem] opacity-70 mt-1">
                     {estimate.provider}
                 </div>
+                {staleness && (
+                    <div className={`text-[0.6rem] font-medium mt-1 ${staleness.color}`}>
+                        ⚠ {staleness.label}
+                    </div>
+                )}
                 {isCheapest && (
                     <div className="absolute top-2 right-2 bg-white text-green-600 px-2 py-1 rounded text-[0.65rem] font-bold">
                         CHEAPEST

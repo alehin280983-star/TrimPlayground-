@@ -22,12 +22,12 @@ export function ExitIntentPopup({ hasCalculated }: ExitIntentPopupProps) {
 
     useEffect(() => {
         if (hasCalculated) return;
-        if (sessionStorage.getItem('trim_exit_intent_shown')) return;
 
         const handleMouseLeave = (e: MouseEvent) => {
             if (e.clientY <= 0) {
-                setVisible(true);
+                if (sessionStorage.getItem('trim_exit_intent_shown')) return;
                 sessionStorage.setItem('trim_exit_intent_shown', 'true');
+                setVisible(true);
             }
         };
 

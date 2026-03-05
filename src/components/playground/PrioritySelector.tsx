@@ -7,9 +7,9 @@ interface PrioritySelectorProps {
     onChange: (priority: PriorityMode) => void;
 }
 
-const OPTIONS: { value: PriorityMode; label: string }[] = [
+const OPTIONS: { value: PriorityMode; label: string; title?: string }[] = [
     { value: 'cost', label: 'Cost' },
-    { value: 'balanced', label: 'Balanced' },
+    { value: 'balanced', label: 'Balanced', title: '60% cost + 40% benchmark speed rating' },
     { value: 'quality', label: 'Quality' },
 ];
 
@@ -22,6 +22,7 @@ export default function PrioritySelector({ value, onChange }: PrioritySelectorPr
                     <button
                         key={opt.value}
                         onClick={() => onChange(opt.value)}
+                        title={opt.title}
                         className={`
                             px-3 py-1 rounded text-[0.75rem] font-medium transition-colors
                             ${value === opt.value
