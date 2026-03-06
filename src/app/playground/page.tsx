@@ -386,14 +386,14 @@ export default function PlaygroundPage() {
                                         {isExpanded && (
                                             <div className="pl-3 pb-2">
                                                 {/* Price column header */}
-                                                <div className="flex items-center gap-4 px-2 py-0.5 mb-1 text-[0.7rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
-                                                    <span>Model</span>
-                                                    <span className="flex items-center gap-1.5 font-mono">
-                                                        <span>In/1M</span>
-                                                        <span>·</span>
-                                                        <span>Cache/1M</span>
-                                                        <span>·</span>
-                                                        <span>Out/1M</span>
+                                                <div className="flex items-center px-2 py-0.5 mb-1 text-[0.7rem] text-foreground/25 uppercase tracking-wide whitespace-nowrap">
+                                                    <span className="flex-1">Model</span>
+                                                    <span className="flex items-center font-mono">
+                                                        <span className="inline-block w-[62px] text-right">In/1M</span>
+                                                        <span className="inline-block w-[14px] text-center">·</span>
+                                                        <span className="inline-block w-[62px] text-right">Cache/1M</span>
+                                                        <span className="inline-block w-[14px] text-center">·</span>
+                                                        <span className="inline-block w-[62px] text-right">Out/1M</span>
                                                     </span>
                                                 </div>
                                                 {CATEGORY_ORDER.map((category) => {
@@ -412,19 +412,19 @@ export default function PlaygroundPage() {
                                                                     key={model.id}
                                                                     onClick={() => handleModelToggle(model)}
                                                                     className={`
-                                                                        flex items-center gap-2 py-1 px-2 rounded cursor-pointer transition-colors whitespace-nowrap
+                                                                        group flex items-center py-1 px-2 rounded cursor-pointer transition-colors whitespace-nowrap
                                                                         ${selectedModels.find(m => m.id === model.id)
                                                                             ? 'font-bold text-foreground bg-foreground/10'
                                                                             : 'text-foreground/60 hover:text-foreground hover:bg-foreground/5'}
                                                                     `}
                                                                 >
-                                                                    <span className="text-[0.9rem]">{model.name}</span>
-                                                                    <span className="flex items-center gap-1.5 text-[0.8rem] font-mono text-foreground/40 pl-2">
-                                                                        <span title="Input price per 1M tokens">{fmtPrice(model.inputPrice)}</span>
-                                                                        <span className="text-foreground/20">·</span>
-                                                                        <span title="Cached input price per 1M tokens">{fmtPrice(model.cachedInputPrice)}</span>
-                                                                        <span className="text-foreground/20">·</span>
-                                                                        <span title="Output price per 1M tokens">{fmtPrice(model.outputPrice)}</span>
+                                                                    <span className="flex-1 text-[0.9rem]">{model.name}</span>
+                                                                    <span className="flex items-center text-[0.8rem] font-mono text-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                                                                        <span className="inline-block w-[62px] text-right" title="Input per 1M tokens">{fmtPrice(model.inputPrice)}</span>
+                                                                        <span className="inline-block w-[14px] text-center text-foreground/20">·</span>
+                                                                        <span className="inline-block w-[62px] text-right" title="Cached input per 1M tokens">{fmtPrice(model.cachedInputPrice)}</span>
+                                                                        <span className="inline-block w-[14px] text-center text-foreground/20">·</span>
+                                                                        <span className="inline-block w-[62px] text-right" title="Output per 1M tokens">{fmtPrice(model.outputPrice)}</span>
                                                                     </span>
                                                                 </div>
                                                             ))}
