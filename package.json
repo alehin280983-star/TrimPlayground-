@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync-prices": "npx tsx scripts/sync-prices.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
@@ -40,8 +43,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.0.0",
     "drizzle-kit": "^0.31.8",
     "drizzle-orm": "^0.45.1",
+    "tsx": "^4.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "postgres": "^3.4.8",

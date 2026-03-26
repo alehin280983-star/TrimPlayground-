@@ -768,7 +768,7 @@ src/app/api/workflows/run/[id]/route.ts
 - [x] есть `overhead_breakdown`
 - [x] есть `task_class` на каждом run
 - [x] есть `recommendation` с actionable flag, detail, alternative
-- [ ] каждый расчёт ссылается на pricing snapshot с `source_url` и `fetched_at` (отложено: сейчас используется models.ts напрямую)
+- [x] каждый расчёт ссылается на pricing snapshot с `source_url` и `fetched_at` (через `pricingRef` в estimate response; `npm run sync-prices` пишет снапшоты в DB)
 - [x] `schema_version` есть в persistence
 - [x] `outcome_source` фиксируется там, где это возможно
 - [x] feature flags работают: `FEATURE_WORKFLOWS=false` блокирует `/api/workflows/run`

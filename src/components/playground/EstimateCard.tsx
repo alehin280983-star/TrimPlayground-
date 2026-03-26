@@ -42,7 +42,8 @@ export default function EstimateCard({ estimate, isCheapest, requestsPerMonth = 
     };
 
     const getPriceStaleness = (priceUpdatedAt: string) => {
-        const days = Math.floor((Date.now() - new Date(priceUpdatedAt).getTime()) / 86_400_000);
+        const now = typeof window !== 'undefined' ? window.performance.timeOrigin + window.performance.now() : 0;
+        const days = Math.floor((now - new Date(priceUpdatedAt).getTime()) / 86_400_000);
         if (days < 7) return null;
         if (days < 30) return { days, color: 'text-orange-300', label: `Prices updated ${days}d ago` };
         return { days, color: 'text-red-300', label: `Prices updated ${days}d ago` };

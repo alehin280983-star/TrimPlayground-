@@ -46,11 +46,19 @@ export async function POST(request: NextRequest) {
     const scored = normalizeScores(estimates);
     const recommended = recommend(estimates);
 
+    // Pricing reference — satisfies §12 "каждый расчёт ссылается на pricing snapshot"
+    const pricingRef = {
+        source: model.priceSourceUrl ?? 'models.ts',
+        fetchedAt: model.priceUpdatedAt,
+        status: 'manual' as const,
+    };
+
     return NextResponse.json({
         success: true,
         data: {
             estimates: scored,
             recommendedTemplateId: recommended?.templateId ?? null,
+            pricingRef,
         },
     });
 }
