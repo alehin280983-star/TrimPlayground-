@@ -1,11 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getAllModels, getModelById } from '@/lib/config';
 import { formatCost, formatTokens } from '@/lib/tokens';
 import { WORKFLOW_TEMPLATES, estimateWorkflow, normalizeScores, recommend } from '@/lib/workflows';
 import { TaskClassSchema, TASK_CLASS_LABELS, TaskClass } from '@/lib/taxonomy';
+import type { WorkflowRunResult } from '@/lib/workflows/runner';
 import type { ProviderType } from '@/types';
+
+const API_KEY_STORAGE = 'wf_api_key';
 
 const PROVIDER_LABELS: Record<ProviderType, string> = {
     openai: 'OpenAI',
@@ -47,6 +50,42 @@ export function WorkflowCompare() {
     const [tasksPerMonth, setTasksPerMonth] = useState(10_000);
     const [inputTokens, setInputTokens] = useState(800);
     const [outputTokens, setOutputTokens] = useState(400);
+
+    // Live Run state
+    const [livePrompt, setLivePrompt] = useState('');
+    const [apiKey, setApiKey] = useState('');
+    const [runningTemplateId, setRunningTemplateId] = useState<string | null>(null);
+    const [liveResults, setLiveResults] = useState<Record<string, WorkflowRunResult>>({});
+    const [liveErrors, setLiveErrors] = useState<Record<string, string>>({});
+
+    // Persist API key in sessionStorage
+    useEffect(() => {
+        const stored = sessionStorage.getItem(API_KEY_STORAGE);
+        if (stored) setApiKey(stored);
+    }, []);
+    useEffect(() => {
+        if (apiKey) sessionStorage.setItem(API_KEY_STORAGE, apiKey);
+    }, [apiKey]);
+
+    async function runLive(templateId: string) {
+        if (!livePrompt.trim() || !apiKey.trim()) return;
+        setRunningTemplateId(templateId);
+        setLiveErrors(prev => ({ ...prev, [templateId]: '' }));
+        try {
+            const res = await fetch('/api/workflows/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ templateId, modelId, apiKey, prompt: livePrompt, taskClass }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error ?? 'Run failed');
+            setLiveResults(prev => ({ ...prev, [templateId]: json.data }));
+        } catch (err) {
+            setLiveErrors(prev => ({ ...prev, [templateId]: err instanceof Error ? err.message : 'Run failed' }));
+        } finally {
+            setRunningTemplateId(null);
+        }
+    }
 
     const model = useMemo(() => getModelById(modelId), [modelId]);
 
@@ -167,6 +206,38 @@ export function WorkflowCompare() {
                 </div>
             </div>
 
+            {/* Live Run Panel */}
+            <div className="bg-background border border-foreground/10 rounded-xl p-6 shadow-sm">
+                <h2 className="font-extrabold uppercase tracking-wider text-sm text-foreground/70 mb-4">
+                    Live Run
+                </h2>
+                <div className="flex flex-col gap-4">
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">Prompt</span>
+                        <textarea
+                            rows={3}
+                            value={livePrompt}
+                            onChange={e => setLivePrompt(e.target.value)}
+                            placeholder="Enter a prompt to run through each architecture..."
+                            className="px-3 py-2 rounded-lg bg-background border border-foreground/15 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent/40"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">API Key (stored in sessionStorage only)</span>
+                        <input
+                            type="password"
+                            value={apiKey}
+                            onChange={e => setApiKey(e.target.value)}
+                            placeholder={`Key for ${model?.provider ?? 'selected provider'}...`}
+                            className="px-3 py-2 rounded-lg bg-background border border-foreground/15 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                        />
+                    </label>
+                    <p className="text-xs text-foreground/40">
+                        Click &quot;Run&quot; on any architecture card below. Key is sent once per request and never stored on server.
+                    </p>
+                </div>
+            </div>
+
             {/* Results */}
             {scored.length === 0 ? (
                 <div className="text-foreground/50 text-sm">No templates available for this task type.</div>
@@ -195,7 +266,7 @@ export function WorkflowCompare() {
                                 >
                                     {/* Header */}
                                     <div className="flex items-start justify-between gap-3">
-                                        <div>
+                                        <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <span className={`inline-block w-2 h-2 rounded-full ${barColor}`} />
                                                 <span className="font-black text-sm">{est.templateName}</span>
@@ -205,9 +276,19 @@ export function WorkflowCompare() {
                                             </div>
                                             <div className="text-xs text-foreground/50 mt-1">{template.description}</div>
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <div className="text-2xl font-black">{formatCost(est.totalCostPerTask)}</div>
-                                            <div className="text-xs text-foreground/50">per task</div>
+                                        <div className="flex flex-col items-end gap-2 shrink-0">
+                                            <div className="text-right">
+                                                <div className="text-2xl font-black">{formatCost(est.totalCostPerTask)}</div>
+                                                <div className="text-xs text-foreground/50">per task</div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                disabled={!livePrompt.trim() || !apiKey.trim() || runningTemplateId !== null}
+                                                onClick={() => runLive(est.templateId)}
+                                                className="px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-colors bg-background border-foreground/20 text-foreground/70 hover:text-foreground hover:border-foreground/40 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                {runningTemplateId === est.templateId ? 'Running…' : 'Run Live'}
+                                            </button>
                                         </div>
                                     </div>
 
@@ -274,6 +355,44 @@ export function WorkflowCompare() {
                                             ))}
                                         </div>
                                     </div>
+
+                                    {/* Live Run Results */}
+                                    {liveErrors[est.templateId] && (
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-xs text-red-500">
+                                            {liveErrors[est.templateId]}
+                                        </div>
+                                    )}
+                                    {liveResults[est.templateId] && (() => {
+                                        const run = liveResults[est.templateId];
+                                        return (
+                                            <div className="border-t border-foreground/10 pt-4">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="text-[11px] font-bold uppercase tracking-wider text-foreground/50">
+                                                        Live Result <span className="text-foreground/30">· Confidence: Exact</span>
+                                                    </div>
+                                                    <div className="flex gap-4 text-xs">
+                                                        <span className="font-black text-foreground">{formatCost(run.totalCostUsd)}</span>
+                                                        <span className="text-foreground/50">{run.e2eMs}ms e2e</span>
+                                                        <span className={run.success ? 'text-emerald-500' : 'text-red-500'}>
+                                                            {run.success ? '✓ ok' : '✗ failed'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1.5">
+                                                    {run.steps.map(step => (
+                                                        <div key={step.agentId} className="flex justify-between text-xs bg-foreground/5 rounded px-3 py-2">
+                                                            <span className="font-bold text-foreground/70">{step.role}</span>
+                                                            <span className="text-foreground/50 flex gap-3">
+                                                                <span>{formatTokens(step.inputTokens)} in · {formatTokens(step.outputTokens)} out</span>
+                                                                <span className="font-bold">{formatCost(step.costUsd)}</span>
+                                                                <span>{step.latencyMs}ms</span>
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             );
                         })}
