@@ -23,6 +23,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 });
     }
 
+    // §6.6: Production live mode without persistence is not allowed.
+    if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+        return NextResponse.json(
+            { success: false, error: 'Persistence required in production mode. Set DATABASE_URL.' },
+            { status: 503 }
+        );
+    }
+
     const parsed = RequestSchema.safeParse(body);
     if (!parsed.success) {
         return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
@@ -75,8 +83,9 @@ export async function POST(request: NextRequest) {
             });
         }
     } catch {
-        // DB not configured or unavailable — result still returned
+        // DB not configured or unavailable — run still returned, but not persisted
+        return NextResponse.json({ success: true, data: { ...result, persisted: false } });
     }
 
-    return NextResponse.json({ success: true, data: result });
+    return NextResponse.json({ success: true, data: { ...result, persisted: true } });
 }

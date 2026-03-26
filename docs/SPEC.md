@@ -442,6 +442,52 @@ MVP-правило:
 
 И убедиться, что новая функциональность включается аддитивно.
 
+### 6.6. Правила режима DATABASE_URL (Persistence Mode)
+
+#### Общее правило
+
+```
+DATABASE_URL optional for local development.
+DATABASE_URL required for persistence-enabled environments.
+Production live mode without persistence is not allowed.
+```
+
+#### Ephemeral / stateless mode (DATABASE_URL отсутствует)
+
+Live Run **работает** без DATABASE_URL:
+- выполняет live-вызов к LLM;
+- возвращает step-level results (tokens, cost, latency);
+- показывает `Confidence: Exact`;
+- работает Architecture Compare и Run Live.
+
+Live Run **не работает** без DATABASE_URL:
+- история запусков (`/run/[id]`);
+- calibration и retraining estimator;
+- накопление run corpus (data moat).
+
+UI **обязан** показывать неблокирующее сообщение, если DATABASE_URL не задан:
+
+```
+Results are not persisted in local development mode.
+```
+
+Сообщение должно быть:
+- видимым, но не мешающим взаимодействию;
+- не блокирующим кнопку Run Live;
+- информационным, не предупреждением об ошибке.
+
+#### Правила для prod
+
+- Если `NODE_ENV === 'production'` и DATABASE_URL отсутствует — сервер **обязан** вернуть 503 на `/api/workflows/run` с явным сообщением: `Persistence required in production mode`.
+- Это предотвращает случайный запуск live mode в prod без записи результатов.
+
+#### Реализация
+
+- `src/db/index.ts` — lazy connection, не падает при import без DATABASE_URL.
+- `/api/workflows/run` — DB writes в `try/catch`; если не удалось — run всё равно возвращается.
+- В prod: проверить `DATABASE_URL` до запуска run, вернуть 503 если отсутствует.
+- UI: `WorkflowCompare` проверяет ответ и показывает ephemeral-notice если `persisted: false`.
+
 ---
 
 ## 7. В чем не уверен

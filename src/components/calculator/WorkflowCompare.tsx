@@ -67,6 +67,8 @@ export function WorkflowCompare() {
         if (apiKey) sessionStorage.setItem(API_KEY_STORAGE, apiKey);
     }, [apiKey]);
 
+    const [ephemeral, setEphemeral] = useState(false);
+
     async function runLive(templateId: string) {
         if (!livePrompt.trim() || !apiKey.trim()) return;
         setRunningTemplateId(templateId);
@@ -80,6 +82,7 @@ export function WorkflowCompare() {
             const json = await res.json();
             if (!json.success) throw new Error(json.error ?? 'Run failed');
             setLiveResults(prev => ({ ...prev, [templateId]: json.data }));
+            if (json.data.persisted === false) setEphemeral(true);
         } catch (err) {
             setLiveErrors(prev => ({ ...prev, [templateId]: err instanceof Error ? err.message : 'Run failed' }));
         } finally {
@@ -235,6 +238,12 @@ export function WorkflowCompare() {
                     <p className="text-xs text-foreground/40">
                         Click &quot;Run&quot; on any architecture card below. Key is sent once per request and never stored on server.
                     </p>
+                    {ephemeral && (
+                        <div className="flex items-center gap-2 bg-foreground/5 border border-foreground/10 rounded-lg px-4 py-2.5 text-xs text-foreground/60">
+                            <span>ℹ</span>
+                            <span>Results are not persisted in local development mode. Set <code className="font-mono">DATABASE_URL</code> to enable run history.</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
