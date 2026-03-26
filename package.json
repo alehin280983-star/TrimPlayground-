@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "drizzle-kit migrate && next build",
+    "build": "drizzle-kit migrate && npx tsx scripts/sync-prices.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "sync-prices": "npx tsx scripts/sync-prices.ts",
