@@ -349,6 +349,15 @@ export function WorkflowCompare() {
                                         </div>
                                     </div>
 
+                                    {/* Recommendation */}
+                                    {est.recommendation && (
+                                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-xs">
+                                            <span className="font-bold text-amber-500 uppercase tracking-wider">{est.recommendation.flag}</span>
+                                            <span className="text-foreground/60 ml-2">{est.recommendation.detail}</span>
+                                            <div className="text-foreground/50 mt-1">→ {est.recommendation.alternative}</div>
+                                        </div>
+                                    )}
+
                                     {/* Step breakdown */}
                                     <div>
                                         <div className="text-[11px] font-bold uppercase tracking-wider text-foreground/50 mb-2">Step breakdown</div>
@@ -387,6 +396,13 @@ export function WorkflowCompare() {
                                                         </span>
                                                     </div>
                                                 </div>
+                                                {run.recommendation && (
+                                                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-xs">
+                                                        <span className="font-bold text-amber-500 uppercase tracking-wider">{run.recommendation.flag}</span>
+                                                        <span className="text-foreground/60 ml-2">{run.recommendation.detail}</span>
+                                                        <div className="text-foreground/50 mt-1">→ {run.recommendation.alternative}</div>
+                                                    </div>
+                                                )}
                                                 <div className="flex flex-col gap-1.5">
                                                     {run.steps.map(step => (
                                                         <div key={step.agentId} className="flex justify-between text-xs bg-foreground/5 rounded px-3 py-2">

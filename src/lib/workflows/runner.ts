@@ -15,7 +15,8 @@ import {
 } from '@/lib/providers';
 import { BaseProvider } from '@/lib/providers/base';
 import { normalizeOpenAIChat, normalizeAnthropic, normalizeGoogle, normalizeDeepSeek } from '@/lib/adapters';
-import { WorkflowTemplate } from './types';
+import { WorkflowTemplate, Recommendation } from './types';
+import { recommendFromLiveRun } from './recommendations';
 import { TaskClass } from '@/lib/taxonomy';
 
 function createProviderWithKey(providerType: ProviderType, apiKey: string): BaseProvider {
@@ -75,6 +76,7 @@ export interface WorkflowRunResult {
     totalCostUsd: number;
     e2eMs: number;
     success: boolean;
+    recommendation: Recommendation | null;
 }
 
 export async function runWorkflow(
@@ -183,5 +185,6 @@ export async function runWorkflow(
         totalCostUsd,
         e2eMs,
         success,
+        recommendation: recommendFromLiveRun(stepResults, e2eMs),
     };
 }

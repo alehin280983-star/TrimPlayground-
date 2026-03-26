@@ -1,5 +1,6 @@
 import { ModelConfig } from '@/types';
 import { WorkflowTemplate, WorkflowEstimate, WorkflowStepEstimate } from './types';
+import { recommendFromEstimate } from './recommendations';
 
 interface EstimatorInputs {
     inputTokensPerCall: number;
@@ -62,7 +63,7 @@ export function estimateWorkflow(
         ? template.successRate / totalCostPerTask
         : 0;
 
-    return {
+    const estimate: WorkflowEstimate = {
         templateId: template.id,
         templateName: template.name,
         architecturePattern: template.architecturePattern,
@@ -78,5 +79,9 @@ export function estimateWorkflow(
         totalCostPerMonth,
         successRate: template.successRate,
         efficiencyScore,
+        recommendation: null,
     };
+
+    estimate.recommendation = recommendFromEstimate(estimate);
+    return estimate;
 }

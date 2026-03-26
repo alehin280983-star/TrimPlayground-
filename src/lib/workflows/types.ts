@@ -45,6 +45,12 @@ export interface WorkflowOverheadBreakdown {
     hitlCostUsd: number;
 }
 
+export interface Recommendation {
+    flag: string;
+    detail: string;
+    alternative: string;
+}
+
 export interface WorkflowEstimate {
     templateId: string;
     templateName: string;
@@ -59,4 +65,5 @@ export interface WorkflowEstimate {
 
     successRate: number;
     efficiencyScore: number;
+    recommendation: Recommendation | null;
 }

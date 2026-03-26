@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTemplate, runWorkflow } from '@/lib/workflows';
+import { getTemplate, runWorkflow, estimateWorkflow } from '@/lib/workflows';
 import { TaskClassSchema } from '@/lib/taxonomy';
 import { getDb, schema } from '@/db';
+import { getModelById } from '@/lib/config';
+import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -16,6 +18,11 @@ const RequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+    // Feature flag guard
+    if (process.env.FEATURE_WORKFLOWS === 'false') {
+        return NextResponse.json({ success: false, error: 'Workflow live runs are disabled' }, { status: 403 });
+    }
+
     let body: unknown;
     try {
         body = await request.json();
@@ -81,6 +88,57 @@ export async function POST(request: NextRequest) {
                 accepted: step.success,
                 outcomeSource: 'auto',
             });
+        }
+
+        // Calibration tracking: compare virtual estimate vs actual live result
+        const model = getModelById(modelId);
+        if (model) {
+            const estimate = estimateWorkflow(template, model, {
+                inputTokensPerCall: result.steps.reduce((s, r) => s + r.inputTokens, 0) / Math.max(result.steps.length, 1),
+                outputTokensPerCall: result.steps.reduce((s, r) => s + r.outputTokens, 0) / Math.max(result.steps.length, 1),
+                tasksPerMonth: 1,
+            });
+            const estimatedCost = estimate.totalCostPerTask;
+            const actualCost = result.totalCostUsd;
+            const errorPct = estimatedCost > 0
+                ? ((actualCost - estimatedCost) / estimatedCost) * 100
+                : null;
+
+            // Upsert calibration record (increment sample_count if exists)
+            const existing = await db.query.calibrationRecord.findFirst({
+                where: and(
+                    eq(schema.calibrationRecord.taskClass, taskClass),
+                    eq(schema.calibrationRecord.templateId, templateId),
+                    eq(schema.calibrationRecord.modelId, modelId)
+                ),
+            });
+
+            if (existing) {
+                const newCount = existing.sampleCount + 1;
+                const prevEst = Number(existing.estimatedCostPerTask ?? 0);
+                const prevAct = Number(existing.actualCostPerTask ?? 0);
+                await db.update(schema.calibrationRecord)
+                    .set({
+                        estimatedCostPerTask: String((prevEst + estimatedCost) / 2),
+                        actualCostPerTask: String((prevAct + actualCost) / 2),
+                        errorPct: errorPct !== null ? String(errorPct.toFixed(4)) : existing.errorPct,
+                        sampleCount: newCount,
+                        calibrationStatus: newCount >= 30 ? 'calibrated' : 'pending',
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(schema.calibrationRecord.id, existing.id));
+            } else {
+                await db.insert(schema.calibrationRecord).values({
+                    taskClass,
+                    templateId,
+                    modelId,
+                    estimatedCostPerTask: String(estimatedCost),
+                    actualCostPerTask: String(actualCost),
+                    errorPct: errorPct !== null ? String(errorPct.toFixed(4)) : null,
+                    sampleCount: 1,
+                    calibrationStatus: 'pending',
+                });
+            }
         }
     } catch {
         // DB not configured or unavailable — run still returned, but not persisted

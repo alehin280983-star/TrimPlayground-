@@ -760,18 +760,19 @@ src/app/api/workflows/run/[id]/route.ts
 
 Система считается готовой к первой рабочей версии, если:
 
-- [ ] можно сравнить минимум 2 workflow-архитектуры
-- [ ] работает `Virtual Preview` (rule-based, label = Estimated)
-- [ ] current prompt compare (`/playground`) не сломан
-- [ ] есть `cost_total` с confidence label
-- [ ] есть `ttft_ms` и `e2e_ms`
-- [ ] есть `overhead_breakdown`
-- [ ] есть `task_class` на каждом run
-- [ ] есть `recommendation` с хотя бы одним actionable flag
-- [ ] каждый расчёт ссылается на pricing snapshot с `source_url` и `fetched_at`
-- [ ] `schema_version` есть в persistence
-- [ ] `outcome_source` фиксируется там, где это возможно
-- [ ] feature flags работают: новые фичи выключаемы через env
+- [x] можно сравнить минимум 2 workflow-архитектуры
+- [x] работает `Virtual Preview` (rule-based, label = Estimated)
+- [x] current prompt compare (`/playground`) не сломан
+- [x] есть `cost_total` с confidence label
+- [x] есть `e2e_ms` (ttft_ms — known gap, требует стриминг в runner, отложено)
+- [x] есть `overhead_breakdown`
+- [x] есть `task_class` на каждом run
+- [x] есть `recommendation` с actionable flag, detail, alternative
+- [ ] каждый расчёт ссылается на pricing snapshot с `source_url` и `fetched_at` (отложено: сейчас используется models.ts напрямую)
+- [x] `schema_version` есть в persistence
+- [x] `outcome_source` фиксируется там, где это возможно
+- [x] feature flags работают: `FEATURE_WORKFLOWS=false` блокирует `/api/workflows/run`
+- [x] calibration tracking: `calibration_record` table накапливает estimate vs actual, error_pct, sample_count
 
 ---
 

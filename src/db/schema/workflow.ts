@@ -59,6 +59,22 @@ export const stepLog = pgTable('step_log', {
     schemaVersion: integer('schema_version').notNull().default(1),
 });
 
+export const calibrationRecord = pgTable('calibration_record', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    taskClass: taskClassEnum('task_class').notNull(),
+    templateId: varchar('template_id', { length: 64 }).notNull(),
+    modelId: varchar('model_id', { length: 128 }).notNull(),
+    estimatedCostPerTask: decimal('estimated_cost_per_task', { precision: 20, scale: 10 }),
+    actualCostPerTask: decimal('actual_cost_per_task', { precision: 20, scale: 10 }),
+    errorPct: decimal('error_pct', { precision: 10, scale: 4 }),
+    sampleCount: integer('sample_count').notNull().default(1),
+    // pending = needs more samples; calibrated = reliable; stale = model prices changed
+    calibrationStatus: varchar('calibration_status', { length: 32 }).notNull().default('pending'),
+    schemaVersion: integer('schema_version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const pricingSnapshot = pgTable('pricing_snapshot', {
     id: uuid('id').primaryKey().defaultRandom(),
     provider: varchar('provider', { length: 64 }).notNull(),
