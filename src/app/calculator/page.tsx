@@ -8,6 +8,9 @@ import { calculateAgenticCost, type AgenticCostInputs, type WorkloadUnit } from 
 import { formatCost, formatTokens } from '@/lib/tokens';
 import type { ProviderType } from '@/types';
 import { ExportButtons } from '@/components/calculator/ExportButtons';
+import { WorkflowCompare } from '@/components/calculator/WorkflowCompare';
+
+type CalcView = 'model' | 'compare';
 
 const PROVIDER_LABELS: Record<ProviderType, string> = {
   openai: 'OpenAI',
@@ -38,6 +41,8 @@ function numStr(value: number): string {
 }
 
 export default function CalculatorPage() {
+  const [view, setView] = useState<CalcView>('model');
+
   const textModels = useMemo(() => {
     const all = getAllModels();
     return all.filter(m => (m.modality ?? 'text') === 'text');
@@ -148,20 +153,39 @@ export default function CalculatorPage() {
       <Header />
       <main className="bg-background min-h-screen">
         <div className="max-w-6xl mx-auto px-4 py-12">
-          <div className="flex flex-col gap-3 mb-10">
+          <div className="flex flex-col gap-3 mb-8">
             <div className="text-xs font-bold tracking-widest uppercase text-foreground/40">
-              Trim Playground v1
+              Trim Playground
             </div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight">
-              Minimal Agent Cost Calculator
+              Agent Economics
             </h1>
-            <p className="text-foreground/60 max-w-3xl">
-              Computes token-based cost using model pricing, plus optional modifiers for cached input and batch pricing.
-              Agentic overhead (retries, multi-call workflows, context growth, tool costs) is not reliably measurable from public sources—use explicit inputs or an uncertainty range.
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Tab toggle */}
+          <div className="flex gap-2 mb-8">
+            {([
+              { key: 'model', label: 'Model Cost' },
+              { key: 'compare', label: 'Architecture Compare' },
+            ] as { key: CalcView; label: string }[]).map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setView(tab.key)}
+                className={`px-4 py-2 rounded-lg border text-sm font-bold uppercase tracking-wider transition-colors ${
+                  view === tab.key
+                    ? 'bg-foreground text-background border-foreground'
+                    : 'bg-background border-foreground/15 text-foreground/60 hover:text-foreground'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {view === 'compare' && <WorkflowCompare />}
+
+          {view === 'model' && <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             {/* Inputs */}
             <div className="bg-background border border-foreground/10 rounded-xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
@@ -555,7 +579,7 @@ export default function CalculatorPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>}
         </div>
       </main>
       <Footer />
