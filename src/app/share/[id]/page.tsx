@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { redis } from '@/lib/rate-limit';
 import { formatCost, formatTokens } from '@/lib/tokens';
 import ShareCopyButtons from '@/components/share/ShareCopyButtons';
+import { ShareViewTracker } from '@/components/share/ShareViewTracker';
 
 interface SharePayload {
     mode: 'estimate' | 'sample';
@@ -214,6 +215,7 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
                 <div className="mt-6">
                     <ShareCopyButtons data={data} shareId={id} />
                 </div>
+                <ShareViewTracker shareId={id} mode={data.mode} modelCount={data.models.length} />
 
                 {/* Footer */}
                 <div className="mt-6 text-center text-xs text-foreground/30">

@@ -16,7 +16,7 @@ export default function Home() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-foreground"></span>
               </span>
-              <span className="text-xs font-medium text-foreground/80">Compare 15+ AI models in real-time</span>
+              <span className="text-xs font-medium text-foreground/80">Compare 140+ AI models across 10 providers</span>
             </div>
 
             {/* Title */}
@@ -39,19 +39,13 @@ export default function Home() {
               >
                 Start Comparing Free
               </Link>
-              <Link
-                href="/calculator"
-                className="px-10 py-4 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground font-bold text-lg transition-all border border-foreground/10"
-              >
-                Try Cost Calculator
-              </Link>
             </div>
 
             {/* Mini Features */}
             <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-sm font-medium text-foreground/40">
               {[
                 "No credit card required",
-                "5 free comparisons/day",
+                "Always free to use",
                 "Real-time pricing"
               ].map((feature, i) => (
                 <div key={i} className="flex items-center gap-2">

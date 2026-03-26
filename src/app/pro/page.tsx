@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePostHog } from 'posthog-js/react';
 
@@ -26,6 +26,10 @@ export default function ProPage() {
     const [email, setEmail] = useState('');
     const [wtp, setWtp] = useState('');
     const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+    useEffect(() => {
+        ph?.capture('pro_page_viewed');
+    }, [ph]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

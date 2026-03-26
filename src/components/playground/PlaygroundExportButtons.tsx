@@ -150,6 +150,7 @@ export function PlaygroundExportButtons(props: PlaygroundExportButtonsProps) {
     await navigator.clipboard.writeText(md);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    ph?.capture('export_clicked', { format: 'markdown', mode: props.mode });
   }
 
   function handleJSON() {
@@ -163,10 +164,12 @@ export function PlaygroundExportButtons(props: PlaygroundExportButtonsProps) {
     a.download = `trim-playground-${data.mode}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    ph?.capture('export_clicked', { format: 'json', mode: props.mode });
   }
 
   async function handlePNG() {
     if (!props.resultsRef.current) return;
+    ph?.capture('export_clicked', { format: 'png', mode: props.mode });
     const { default: html2canvas } = await import('html2canvas-pro');
     const canvas = await html2canvas(props.resultsRef.current, { backgroundColor: null });
     canvas.toBlob((blob) => {
