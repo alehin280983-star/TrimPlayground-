@@ -28,17 +28,19 @@ function stepCost(
 export function estimateWorkflow(
     template: WorkflowTemplate,
     model: ModelConfig,
-    inputs: EstimatorInputs
+    inputs: EstimatorInputs,
+    modelOverrides?: Record<string, ModelConfig>
 ): WorkflowEstimate {
     const stepBreakdown: WorkflowStepEstimate[] = [];
     let baseCostPerTask = 0;
 
     for (const step of template.steps) {
+        const stepModel = modelOverrides?.[step.agentId] ?? model;
         const inputTokens = Math.round(inputs.inputTokensPerCall * step.inputFraction);
         const outputTokens = Math.round(inputs.outputTokensPerCall * step.outputFraction);
         const cacheHit = step.cacheHitRate ?? 0;
 
-        const costPerCall = stepCost(model, inputTokens, outputTokens, cacheHit);
+        const costPerCall = stepCost(stepModel, inputTokens, outputTokens, cacheHit);
         const costForStep = costPerCall * step.callsMultiplier;
 
         stepBreakdown.push({
