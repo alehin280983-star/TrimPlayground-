@@ -36,6 +36,7 @@
     --text-muted: #71717a;
     --bg-panel:   #f4f4f5;
     --bg-card:    #ffffff;
+    --logo-color: #09090b;
   }
 }
 
@@ -48,6 +49,7 @@
   --text-muted: #71717a;
   --bg-panel:   #f4f4f5;
   --bg-card:    #ffffff;
+  --logo-color: #09090b;
 }
 
 :root.dark {

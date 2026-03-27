@@ -51,7 +51,8 @@ const SAMPLE_SUPPORTED_MODALITIES: Record<ProviderType, Array<'text' | 'image' |
 };
 
 function fmtPrice(p: number | undefined): string {
-    if (!p) return '—';
+    if (p == null) return '—';
+    if (p === 0) return 'FREE';
     const per1M = p * 1000;
     if (per1M >= 1) return `$${per1M.toFixed(2)}`;
     if (per1M >= 0.1) return `$${per1M.toFixed(3)}`;

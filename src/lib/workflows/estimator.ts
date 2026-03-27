@@ -14,14 +14,18 @@ function stepCost(
     outputTokens: number,
     cachedShare: number
 ): number {
-    const cachedInputPrice = model.cachedInputPrice ?? model.inputPrice;
-    const uncachedTokens = Math.floor(inputTokens * (1 - cachedShare));
+    const inPrice = Math.max(0, model.inputPrice ?? 0);
+    const outPrice = Math.max(0, model.outputPrice ?? 0);
+    const cachedInputPrice = Math.max(0, model.cachedInputPrice ?? inPrice);
+    const clampedCache = Math.max(0, Math.min(1, cachedShare));
+
+    const uncachedTokens = Math.floor(inputTokens * (1 - clampedCache));
     const cachedTokens = inputTokens - uncachedTokens;
 
     const inputCost =
-        (uncachedTokens / 1000) * model.inputPrice +
+        (uncachedTokens / 1000) * inPrice +
         (cachedTokens / 1000) * cachedInputPrice;
-    const outputCost = (outputTokens / 1000) * model.outputPrice;
+    const outputCost = (outputTokens / 1000) * outPrice;
     return inputCost + outputCost;
 }
 
@@ -61,9 +65,10 @@ export function estimateWorkflow(
     const totalCostPerTask = baseCostPerTask + retryCostUsd + coordinationCostUsd + hitlCostUsd;
     const totalCostPerMonth = totalCostPerTask * inputs.tasksPerMonth;
 
-    const efficiencyScore = totalCostPerTask > 0
-        ? template.successRate / totalCostPerTask
-        : 0;
+    // Cost per unit of success — lower = more efficient
+    const efficiencyScore = template.successRate > 0
+        ? totalCostPerTask / template.successRate
+        : Infinity;
 
     const estimate: WorkflowEstimate = {
         templateId: template.id,

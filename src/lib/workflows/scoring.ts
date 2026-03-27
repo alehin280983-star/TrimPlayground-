@@ -1,25 +1,32 @@
 import { WorkflowEstimate } from './types';
 
-// Rank estimates: higher score = better efficiency (more success per dollar)
+// Rank estimates: lower efficiencyScore = better (less cost per unit of success)
 export function rankByEfficiency(estimates: WorkflowEstimate[]): WorkflowEstimate[] {
-    return [...estimates].sort((a, b) => b.efficiencyScore - a.efficiencyScore);
+    return [...estimates].sort((a, b) => a.efficiencyScore - b.efficiencyScore);
 }
 
-// Normalize efficiency scores to 0..100 relative to the best in the set
+// Normalize efficiency scores to 0..100 (100 = best/cheapest per success unit)
 export function normalizeScores(
     estimates: WorkflowEstimate[]
 ): Array<WorkflowEstimate & { normalizedScore: number }> {
-    const maxScore = Math.max(...estimates.map(e => e.efficiencyScore));
-    if (maxScore === 0) {
+    if (estimates.length === 0) {
+        return [];
+    }
+    const scores = estimates.map(e => e.efficiencyScore).filter(s => Number.isFinite(s) && s > 0);
+    if (scores.length === 0) {
         return estimates.map(e => ({ ...e, normalizedScore: 0 }));
     }
+    const minScore = Math.min(...scores); // best (lowest cost/success)
     return estimates.map(e => ({
         ...e,
-        normalizedScore: Math.round((e.efficiencyScore / maxScore) * 100),
+        // Invert: lowest cost/success → 100, higher → lower score
+        normalizedScore: Number.isFinite(e.efficiencyScore) && e.efficiencyScore > 0
+            ? Math.round((minScore / e.efficiencyScore) * 100)
+            : 0,
     }));
 }
 
-// Pick the recommendation: best efficiency unless cost difference is negligible (<5%)
+// Pick the recommendation: best efficiency (lowest cost per success)
 export function recommend(estimates: WorkflowEstimate[]): WorkflowEstimate | null {
     if (estimates.length === 0) return null;
     const ranked = rankByEfficiency(estimates);

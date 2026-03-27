@@ -43,7 +43,11 @@ export async function countTokens(
  * Works well for OpenAI and reasonable estimates for others
  */
 export function countTokensSync(text: string): number {
-    return encode(text).length;
+    try {
+        return encode(text).length;
+    } catch {
+        return Math.ceil(text.length / 4);
+    }
 }
 
 /**

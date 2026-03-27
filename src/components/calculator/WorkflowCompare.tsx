@@ -60,14 +60,14 @@ export function WorkflowCompare() {
     const [taskClass, setTaskClass] = useState<TaskClass>('coding');
     const [scalePos, setScalePos] = useState(scaleToSlider(10_000));
     const scale = useMemo(() => sliderToScale(scalePos), [scalePos]);
-    const inputTokens = 800;
-    const outputTokens = 400;
+    const [inputTokens, setInputTokens] = useState(800);
+    const [outputTokens, setOutputTokens] = useState(400);
 
     // Mode + live run
     const [isLiveMode, setIsLiveMode] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [apiKey, setApiKey] = useState('');
-    const [runningTemplateId, setRunningTemplateId] = useState<string | null>(null);
+    const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
     const [liveResults, setLiveResults] = useState<Record<string, WorkflowRunResult>>({});
     const [liveErrors, setLiveErrors] = useState<Record<string, string>>({});
 
@@ -152,8 +152,8 @@ export function WorkflowCompare() {
     }
 
     async function runLive(templateId: string) {
-        if (!prompt.trim() || !apiKey.trim()) return;
-        setRunningTemplateId(templateId);
+        if (!prompt.trim() || !apiKey.trim() || runningIds.has(templateId)) return;
+        setRunningIds(prev => new Set(prev).add(templateId));
         setLiveErrors(prev => ({ ...prev, [templateId]: '' }));
         try {
             const res = await fetch('/api/workflows/run', {
@@ -170,7 +170,7 @@ export function WorkflowCompare() {
                 [templateId]: err instanceof Error ? err.message : 'Run failed',
             }));
         } finally {
-            setRunningTemplateId(null);
+            setRunningIds(prev => { const next = new Set(prev); next.delete(templateId); return next; });
         }
     }
 
@@ -228,6 +228,32 @@ export function WorkflowCompare() {
                     <div className="flex justify-between text-[10px] text-foreground/25 mt-1">
                         <span>1k</span>
                         <span>500k</span>
+                    </div>
+                </div>
+
+                {/* Token estimates */}
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-foreground/40 mb-1 block">Input tok</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={128000}
+                            value={inputTokens}
+                            onChange={e => setInputTokens(Math.max(1, Number(e.target.value) || 1))}
+                            className="w-full bg-foreground/5 border border-foreground/12 rounded-lg px-2 py-1.5 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-foreground/40 mb-1 block">Output tok</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={128000}
+                            value={outputTokens}
+                            onChange={e => setOutputTokens(Math.max(1, Number(e.target.value) || 1))}
+                            className="w-full bg-foreground/5 border border-foreground/12 rounded-lg px-2 py-1.5 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                        />
                     </div>
                 </div>
 
@@ -430,11 +456,11 @@ export function WorkflowCompare() {
                                 </div>
                                 <button
                                     type="button"
-                                    disabled={!prompt.trim() || !apiKey.trim() || runningTemplateId !== null}
+                                    disabled={!prompt.trim() || !apiKey.trim() || runningIds.size > 0}
                                     onClick={() => applicableTemplates.forEach(t => runLive(t.id))}
                                     className="shrink-0 px-5 py-2 rounded-xl bg-foreground text-background font-black text-xs uppercase tracking-wider hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
                                 >
-                                    {runningTemplateId ? 'Running…' : 'Run All'}
+                                    {runningIds.size > 0 ? 'Running…' : 'Run All'}
                                 </button>
                             </div>
                         )}
