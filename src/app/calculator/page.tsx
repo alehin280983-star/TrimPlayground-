@@ -151,41 +151,47 @@ export default function CalculatorPage() {
   return (
     <>
       <Header />
-      <main className="bg-background min-h-screen">
-        <div className="max-w-6xl mx-auto px-4 py-12">
-          <div className="flex flex-col gap-3 mb-8">
-            <div className="text-xs font-bold tracking-widest uppercase text-foreground/40">
-              Trim Playground
+      <main className="min-h-screen flex flex-col" style={{ background: 'var(--bg-dark)' }}>
+        {/* Sub-nav tabs */}
+        <div className="flex items-center gap-1 px-6 py-2 border-b" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+          {([
+            { key: 'model', label: 'Model Cost' },
+            { key: 'compare', label: 'Architecture Compare' },
+          ] as { key: CalcView; label: string }[]).map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setView(tab.key)}
+              style={view === tab.key
+                ? { background: 'var(--border)', color: 'var(--text-primary)' }
+                : { color: 'var(--text-muted)' }}
+              className="px-4 py-2 rounded-md text-sm font-semibold tracking-wide transition-colors hover:text-white"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Compare: full-width 3-panel */}
+        {view === 'compare' && (
+          <div className="flex-1 overflow-hidden">
+            <WorkflowCompare />
+          </div>
+        )}
+
+        {/* Model Cost: centered */}
+        {view === 'model' && (
+          <div className="max-w-6xl mx-auto w-full px-4 py-10 flex-1">
+            <div className="flex flex-col gap-3 mb-8">
+              <div className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
+                Trim Playground
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black tracking-tight">
+                Agent Economics
+              </h1>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight">
-              Agent Economics
-            </h1>
-          </div>
 
-          {/* Tab toggle */}
-          <div className="flex gap-2 mb-8">
-            {([
-              { key: 'model', label: 'Model Cost' },
-              { key: 'compare', label: 'Architecture Compare' },
-            ] as { key: CalcView; label: string }[]).map(tab => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setView(tab.key)}
-                className={`px-4 py-2 rounded-lg border text-sm font-bold uppercase tracking-wider transition-colors ${
-                  view === tab.key
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'bg-background border-foreground/15 text-foreground/60 hover:text-foreground'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {view === 'compare' && <WorkflowCompare />}
-
-          {view === 'model' && <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             {/* Inputs */}
             <div className="bg-background border border-foreground/10 rounded-xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
@@ -579,8 +585,9 @@ export default function CalculatorPage() {
                 </div>
               </div>
             </div>
-          </div>}
-        </div>
+          </div>
+          </div>
+        )}
       </main>
       <Footer />
     </>

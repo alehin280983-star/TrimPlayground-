@@ -1,63 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
-  /* Strict Bicolor Dark Theme */
-  --background: #41413e;
-  --foreground: #F4F3EE;
-  --accent: #F4F3EE;
-  /* User said "no more colors", so accent is just foreground */
-  --card: #41413e;
-  --logo-color: #141413;
-  /* Same as background for strict minimal look, or slight variation if needed */
+  /* --- Mockup Design System --- */
+  --bg-dark:    #09090b;
+  --bg-panel:   #111114;
+  --bg-card:    #18181b;
+  --border:     #27272a;
 
-  /* Accent Colors */
-  --accent-red: #C8102E;
+  --text-primary: #fafafa;
+  --text-muted:   #a1a1aa;
+
+  --accent-blue:    #3b82f6;
+  --accent-emerald: #10b981;
+  --accent-orange:  #f59e0b;
+  --accent-red:     #C8102E;
+
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Tailwind-mapped theme vars */
+  --background: var(--bg-dark);
+  --foreground: var(--text-primary);
+  --accent:     var(--accent-blue);
+  --card:       var(--bg-card);
+  --logo-color: var(--text-primary);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
     --background: #ffffff;
-    --foreground: #41413e;
-    --accent: #41413e;
-    --card: #ffffff;
+    --foreground: #09090b;
+    --accent:     #3b82f6;
+    --card:       #f4f4f5;
+    --border:     #e4e4e7;
+    --text-muted: #71717a;
+    --bg-panel:   #f4f4f5;
+    --bg-card:    #ffffff;
   }
 }
 
-/* Allow explicit light class override */
 :root.light {
   --background: #ffffff;
-  --foreground: #41413e;
-  --accent: #41413e;
-  --card: #ffffff;
+  --foreground: #09090b;
+  --accent:     #3b82f6;
+  --card:       #f4f4f5;
+  --border:     #e4e4e7;
+  --text-muted: #71717a;
+  --bg-panel:   #f4f4f5;
+  --bg-card:    #ffffff;
 }
 
-/* Explicit dark class override */
 :root.dark {
-  --background: #41413e;
-  --foreground: #F4F3EE;
-  --accent: #F4F3EE;
-  --card: #41413e;
-  --logo-color: #141413;
-  --accent-red: #C8102E;
+  --background: var(--bg-dark);
+  --foreground: var(--text-primary);
+  --accent:     var(--accent-blue);
+  --card:       var(--bg-card);
+  --logo-color: var(--text-primary);
 }
 
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-accent: var(--accent);
-  --color-card: var(--card);
-  --color-logo: var(--logo-color);
+  --color-accent:     var(--accent);
+  --color-card:       var(--card);
+  --color-logo:       var(--logo-color);
 
-  /* Legacy Mappings */
-  --color-trim-dark: var(--trim-dark);
-  --color-trim-blue: var(--trim-blue);
-  --color-trim-red: var(--trim-red);
-  --color-trim-gold: var(--trim-gold);
-  --color-trim-accent: var(--trim-accent);
-  --color-trim-green: var(--trim-green);
+  --color-panel:      var(--bg-panel);
+  --color-border-ui:  var(--border);
+  --color-muted:      var(--text-muted);
+
+  --color-blue:    var(--accent-blue);
+  --color-emerald: var(--accent-emerald);
+  --color-orange:  var(--accent-orange);
+
+  --font-mono: var(--font-mono);
 
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* --- BASE --- */
+* { box-sizing: border-box; }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -65,14 +87,12 @@ body {
   color: var(--foreground);
 }
 
-.hero-gradient {
-  /* Remove color gradient, purely monochrome */
-  background: var(--background);
+code, kbd, pre, .font-mono {
+  font-family: var(--font-mono);
 }
 
-.text-gradient {
-  /* Remove gradient, pure color */
-  color: var(--foreground);
-  background: none;
-  -webkit-text-fill-color: initial;
-}
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
