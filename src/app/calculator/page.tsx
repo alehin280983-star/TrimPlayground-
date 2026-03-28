@@ -151,9 +151,9 @@ export default function CalculatorPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen flex flex-col" style={{ background: 'var(--bg-dark)' }}>
+      <main className="min-h-screen flex flex-col bg-background">
         {/* Sub-nav tabs */}
-        <div className="flex items-center gap-1 px-6 py-2 border-b" style={{ background: 'var(--bg-panel)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-1 px-6 py-2 border-b border-border-ui bg-panel">
           {([
             { key: 'model', label: 'Model Cost' },
             { key: 'compare', label: 'Architecture Compare' },
@@ -162,10 +162,7 @@ export default function CalculatorPage() {
               key={tab.key}
               type="button"
               onClick={() => setView(tab.key)}
-              style={view === tab.key
-                ? { background: 'var(--border)', color: 'var(--text-primary)' }
-                : { color: 'var(--text-muted)' }}
-              className="px-4 py-2 rounded-md text-sm font-semibold tracking-wide transition-colors hover:text-white"
+              className={`px-4 py-2 rounded-md text-sm font-semibold tracking-wide transition-colors ${view === tab.key ? 'bg-border-ui text-foreground' : 'text-muted hover:text-foreground'}`}
             >
               {tab.label}
             </button>
